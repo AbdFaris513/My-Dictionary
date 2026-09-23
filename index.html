@@ -81,6 +81,7 @@
     color:var(--ink); cursor:pointer;
   }
   .menu-btn:hover{ background:var(--accent-soft); }
+  .sync-btn{ display:none; }
 
   /* drawer nav (desktop / tablet) */
   .drawer-overlay{
@@ -134,7 +135,13 @@
     .menu-btn{ display:none; }
     .sync-btn{ display:flex !important; }
     .bottom-nav{ display:flex; }
-    .fab{ display:none; }
+    .fab{
+      top:auto !important;
+      right:calc(24px + env(safe-area-inset-right,0px)) !important;
+      bottom:calc(78px + env(safe-area-inset-bottom,0px)) !important;
+      width:56px !important; height:56px !important;
+      font-size:28px !important; line-height:56px !important;
+    }
     .app{ padding-bottom:92px; }
   }
   .search{
@@ -196,7 +203,7 @@
     background:var(--accent); color:#fff;
     border:none; box-shadow:0 6px 16px rgba(0,0,0,.22);
     font-size:28px; line-height:56px; text-align:center; cursor:pointer;
-    z-index:20;
+    z-index:26;
   }
   .fab:active{ transform:scale(.94); }
 
@@ -535,7 +542,7 @@
     <span class="ic">📅</span> My Results
   </button>
   <button class="drawer-item" data-tab="sync" onclick="closeDrawer(); openSyncPage();">
-    <span class="ic">☁️</span> Sync
+    <span class="ic">⚙️</span> Settings
   </button>
 </nav>
 
@@ -546,8 +553,8 @@
         <h1 class="title">My Dictionary</h1>
         <p class="sub" id="subCount">0 words learned</p>
       </div>
-      <button class="menu-btn sync-btn" id="syncBtn" title="Sync" aria-label="Sync">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19a4.5 4.5 0 0 0 0-9c-.16 0-.32.01-.48.03A6 6 0 0 0 6 10.5a4 4 0 0 0 .5 7.9"/></svg>
+      <button class="menu-btn sync-btn" id="syncBtn" title="Settings" aria-label="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
       <button class="menu-btn" id="menuBtn" title="Menu" aria-label="Menu">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -570,7 +577,6 @@
   <button class="bn-item active" data-tab="home" onclick="navHome()">
     <span class="ic">📖</span><span>Words</span>
   </button>
-  <button class="bn-add" onclick="openAdd()" title="Add word" aria-label="Add word">+</button>
   <button class="bn-item" data-tab="practice" onclick="navPractice()">
     <span class="ic">🎲</span><span>Practice</span>
   </button>
@@ -653,14 +659,14 @@
   </div>
 </div>
 
-<!-- SYNC PAGE -->
+<!-- SETTINGS PAGE (contains Sync) -->
 <div class="page" id="syncPage">
   <div class="page-inner">
     <div class="page-head">
       <button class="icon-btn" onclick="closeSyncPage()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
       </button>
-      <h2>Sync</h2>
+      <h2>Settings</h2>
     </div>
     <div id="syncContent"></div>
   </div>
@@ -829,7 +835,7 @@ function setSyncBadge(state){
   el.style.color = state === 'error' ? 'var(--danger)' : (state === 'pending' ? 'var(--ink-soft)' : 'var(--accent)');
 }
 
-/* ---------------- Sync page UI ---------------- */
+/* ---------------- Settings / Sync page UI ---------------- */
 async function openSyncPage(){
   document.getElementById('syncPage').classList.add('open');
   renderSyncPage();
@@ -845,6 +851,7 @@ function renderSyncPage(msg, isErr){
 
   if(syncEnabled && gistId){
     el.innerHTML = `
+      <h3 style="margin:0 0 4px; font-size:13px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft);">Sync</h3>
       ${msgHtml}
       <p class="sync-note">Connected. Changes save to your GitHub Gist automatically a moment after you make them — do this on each device once and they'll share the same words and stats.</p>
       <div class="gist-id-box"><b>Gist ID</b>${escapeHtml(gistId)}</div>
@@ -857,6 +864,7 @@ function renderSyncPage(msg, isErr){
   }
 
   el.innerHTML = `
+    <h3 style="margin:0 0 4px; font-size:13px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft);">Sync</h3>
     ${msgHtml}
     <p class="sync-note">Sync keeps your dictionary the same on your phone and laptop, using a private GitHub Gist as storage. You'll need a GitHub personal access token with only the "gist" permission.</p>
 
