@@ -132,6 +132,7 @@
 
   @media (max-width: 640px){
     .menu-btn{ display:none; }
+    .sync-btn{ display:flex !important; }
     .bottom-nav{ display:flex; }
     .fab{ display:none; }
     .app{ padding-bottom:92px; }
@@ -214,6 +215,29 @@
   #quizPage{ z-index:32; }
   #resultsPage{ z-index:33; }
   #dayPracticePage{ z-index:34; }
+  #syncPage{ z-index:35; }
+
+  .sync-field{ margin-bottom:16px; }
+  .sync-field label{ display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px; }
+  .sync-field input{
+    width:100%; background:var(--paper-raised); border:1px solid var(--line); border-radius:9px;
+    padding:11px 12px; font-size:14px; color:var(--ink); outline:none; font-family:inherit;
+  }
+  .sync-field input:focus{ border-color:var(--accent); }
+  .sync-note{ font-size:12.5px; color:var(--ink-soft); line-height:1.6; margin:8px 2px 18px; }
+  .sync-divider{ display:flex; align-items:center; gap:10px; margin:26px 0; color:var(--ink-soft); font-size:12px; }
+  .sync-divider::before, .sync-divider::after{ content:''; flex:1; height:1px; background:var(--line); }
+  .sync-status-pill{
+    display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
+    padding:5px 12px; border-radius:20px; margin-bottom:18px;
+  }
+  .sync-status-pill.on{ background:rgba(61,122,77,0.16); color:#3d7a4d; }
+  .sync-status-pill.err{ background:rgba(161,80,62,0.16); color:var(--danger); }
+  .gist-id-box{
+    background:var(--accent-soft); border-radius:9px; padding:12px 14px; margin-bottom:18px;
+    font-size:13px; word-break:break-all; color:var(--ink);
+  }
+  .gist-id-box b{ display:block; font-size:11px; color:var(--ink-soft); font-weight:600; margin-bottom:4px; }
   .page.open{ transform:translateX(0); }
   .page-inner{ max-width:760px; margin:0 auto; padding:20px 20px 60px; }
   .page-head{
@@ -510,6 +534,9 @@
   <button class="drawer-item" data-tab="results" onclick="navResults()">
     <span class="ic">📅</span> My Results
   </button>
+  <button class="drawer-item" data-tab="sync" onclick="closeDrawer(); openSyncPage();">
+    <span class="ic">☁️</span> Sync
+  </button>
 </nav>
 
 <div class="app">
@@ -519,6 +546,9 @@
         <h1 class="title">My Dictionary</h1>
         <p class="sub" id="subCount">0 words learned</p>
       </div>
+      <button class="menu-btn sync-btn" id="syncBtn" title="Sync" aria-label="Sync">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19a4.5 4.5 0 0 0 0-9c-.16 0-.32.01-.48.03A6 6 0 0 0 6 10.5a4 4 0 0 0 .5 7.9"/></svg>
+      </button>
       <button class="menu-btn" id="menuBtn" title="Menu" aria-label="Menu">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
@@ -623,6 +653,19 @@
   </div>
 </div>
 
+<!-- SYNC PAGE -->
+<div class="page" id="syncPage">
+  <div class="page-inner">
+    <div class="page-head">
+      <button class="icon-btn" onclick="closeSyncPage()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </button>
+      <h2>Sync</h2>
+    </div>
+    <div id="syncContent"></div>
+  </div>
+</div>
+
 <!-- QUICK WORD STATS POPUP -->
 <div class="modal-overlay" id="statsModalOverlay" onclick="closeWordStatsModal()"></div>
 <div class="stats-modal" id="statsModal">
@@ -631,20 +674,254 @@
 </div>
 
 <script>
-/* ---------------- storage helpers (browser local storage, per-device) ---------------- */
+/* ---------------- storage helpers ----------------
+   When Gist sync is connected, reads/writes go through an in-memory mirror
+   (gistData) that's pushed to the Gist on change, and mirrored into
+   localStorage as an offline cache. When not connected, this behaves
+   exactly like plain localStorage, same as before. */
+const SYNC_TOKEN_KEY = 'sync:githubToken';
+const SYNC_GISTID_KEY = 'sync:gistId';
+const GIST_FILENAME = 'my-dictionary-data.json';
+let syncEnabled = false;
+let gistData = null;
+let pushTimer = null;
+
+function getSyncToken(){ try{ return window.localStorage.getItem(SYNC_TOKEN_KEY); } catch(e){ return null; } }
+function getSyncGistId(){ try{ return window.localStorage.getItem(SYNC_GISTID_KEY); } catch(e){ return null; } }
+
 async function storageGet(key){
+  if(syncEnabled && gistData){
+    return Object.prototype.hasOwnProperty.call(gistData, key) ? gistData[key] : null;
+  }
   try{ const v = window.localStorage.getItem(key); return v === null ? null : v; }
   catch(e){ console.error('storage get failed', e); return null; }
 }
 async function storageSet(key, value){
+  if(syncEnabled && gistData){
+    gistData[key] = value;
+    try{ window.localStorage.setItem(key, value); }catch(e){}
+    schedulePush();
+    return true;
+  }
   try{ window.localStorage.setItem(key, value); return true; }
   catch(e){ console.error('storage set failed', e); return null; }
 }
 async function storageDelete(key){
+  if(syncEnabled && gistData){
+    delete gistData[key];
+    try{ window.localStorage.removeItem(key); }catch(e){}
+    schedulePush();
+    return true;
+  }
   try{ window.localStorage.removeItem(key); return true; }
   catch(e){ return null; }
 }
 
+/* ---------------- GitHub Gist sync ---------------- */
+async function gistApiFetch(url, options){
+  const token = getSyncToken();
+  const headers = Object.assign({
+    'Accept': 'application/vnd.github+json',
+    'Authorization': 'token ' + token
+  }, (options && options.headers) || {});
+  const res = await fetch(url, Object.assign({}, options, { headers }));
+  if(!res.ok){
+    const text = await res.text().catch(()=> '');
+    throw new Error('GitHub API error ' + res.status + ': ' + text);
+  }
+  return res.json();
+}
+
+function collectLocalDictData(){
+  const data = {};
+  try{
+    for(let i=0;i<window.localStorage.length;i++){
+      const k = window.localStorage.key(i);
+      if(k && k.startsWith('dict:')) data[k] = window.localStorage.getItem(k);
+    }
+  }catch(e){}
+  return data;
+}
+
+function applyGistDataToLocalCache(data){
+  try{
+    const toRemove = [];
+    for(let i=0;i<window.localStorage.length;i++){
+      const k = window.localStorage.key(i);
+      if(k && k.startsWith('dict:')) toRemove.push(k);
+    }
+    toRemove.forEach(k => window.localStorage.removeItem(k));
+    Object.keys(data).forEach(k => window.localStorage.setItem(k, data[k]));
+  }catch(e){}
+}
+
+async function createNewGistFromLocalData(token){
+  window.localStorage.setItem(SYNC_TOKEN_KEY, token);
+  const localData = collectLocalDictData();
+  const body = {
+    description: 'My Dictionary sync data — do not edit manually',
+    public: false,
+    files: { [GIST_FILENAME]: { content: JSON.stringify(localData) || '{}' } }
+  };
+  const result = await gistApiFetch('https://api.github.com/gists', { method: 'POST', body: JSON.stringify(body) });
+  window.localStorage.setItem(SYNC_GISTID_KEY, result.id);
+  gistData = localData;
+  syncEnabled = true;
+  return result.id;
+}
+
+async function connectToExistingGist(token, gistId){
+  window.localStorage.setItem(SYNC_TOKEN_KEY, token);
+  const result = await gistApiFetch('https://api.github.com/gists/' + gistId);
+  const file = result.files && result.files[GIST_FILENAME];
+  let data = {};
+  if(file && file.content){ try{ data = JSON.parse(file.content); }catch(e){ data = {}; } }
+  window.localStorage.setItem(SYNC_GISTID_KEY, gistId);
+  applyGistDataToLocalCache(data);
+  gistData = data;
+  syncEnabled = true;
+}
+
+function schedulePush(){
+  clearTimeout(pushTimer);
+  setSyncBadge('pending');
+  pushTimer = setTimeout(pushGistNow, 900);
+}
+
+async function pushGistNow(){
+  const token = getSyncToken(), gistId = getSyncGistId();
+  if(!token || !gistId || !gistData) return;
+  try{
+    await gistApiFetch('https://api.github.com/gists/' + gistId, {
+      method: 'PATCH',
+      body: JSON.stringify({ files: { [GIST_FILENAME]: { content: JSON.stringify(gistData) } } })
+    });
+    setSyncBadge('synced');
+  }catch(e){
+    console.error('gist push failed', e);
+    setSyncBadge('error');
+  }
+}
+
+async function pullGistNow(){
+  const token = getSyncToken(), gistId = getSyncGistId();
+  if(!token || !gistId) return;
+  const result = await gistApiFetch('https://api.github.com/gists/' + gistId);
+  const file = result.files && result.files[GIST_FILENAME];
+  let data = {};
+  if(file && file.content){ try{ data = JSON.parse(file.content); }catch(e){ data = {}; } }
+  gistData = data;
+  applyGistDataToLocalCache(data);
+}
+
+function disconnectSync(){
+  syncEnabled = false;
+  gistData = null;
+  try{
+    window.localStorage.removeItem(SYNC_TOKEN_KEY);
+    window.localStorage.removeItem(SYNC_GISTID_KEY);
+  }catch(e){}
+}
+
+function setSyncBadge(state){
+  const el = document.getElementById('syncBtn');
+  if(!el) return;
+  el.style.color = state === 'error' ? 'var(--danger)' : (state === 'pending' ? 'var(--ink-soft)' : 'var(--accent)');
+}
+
+/* ---------------- Sync page UI ---------------- */
+async function openSyncPage(){
+  document.getElementById('syncPage').classList.add('open');
+  renderSyncPage();
+}
+function closeSyncPage(){
+  document.getElementById('syncPage').classList.remove('open');
+}
+
+function renderSyncPage(msg, isErr){
+  const el = document.getElementById('syncContent');
+  const gistId = getSyncGistId();
+  const msgHtml = msg ? `<div class="sync-status-pill ${isErr ? 'err' : 'on'}">${isErr ? '⚠️' : '✅'} ${escapeHtml(msg)}</div>` : '';
+
+  if(syncEnabled && gistId){
+    el.innerHTML = `
+      ${msgHtml}
+      <p class="sync-note">Connected. Changes save to your GitHub Gist automatically a moment after you make them — do this on each device once and they'll share the same words and stats.</p>
+      <div class="gist-id-box"><b>Gist ID</b>${escapeHtml(gistId)}</div>
+      <div class="btn-row">
+        <button class="primary-btn" onclick="handleSyncNow()">Sync now</button>
+        <button class="ghost-btn" onclick="handleDisconnectSync()">Disconnect</button>
+      </div>
+    `;
+    return;
+  }
+
+  el.innerHTML = `
+    ${msgHtml}
+    <p class="sync-note">Sync keeps your dictionary the same on your phone and laptop, using a private GitHub Gist as storage. You'll need a GitHub personal access token with only the "gist" permission.</p>
+
+    <div class="sync-field">
+      <label>GitHub personal access token</label>
+      <input id="syncTokenInput" type="password" placeholder="ghp_…">
+    </div>
+
+    <div class="btn-row">
+      <button class="primary-btn" onclick="handleCreateGist()">Create new Gist (first device)</button>
+    </div>
+
+    <div class="sync-divider">or, if you already made one on another device</div>
+
+    <div class="sync-field">
+      <label>Existing Gist ID</label>
+      <input id="syncGistIdInput" type="text" placeholder="e.g. 3a1b2c…">
+    </div>
+    <div class="btn-row">
+      <button class="ghost-btn" onclick="handleConnectExisting()">Connect to existing Gist</button>
+    </div>
+  `;
+}
+
+async function handleCreateGist(){
+  const token = (document.getElementById('syncTokenInput').value || '').trim();
+  if(!token){ renderSyncPage('Enter your token first.', true); return; }
+  renderSyncPage('Creating…');
+  try{
+    await createNewGistFromLocalData(token);
+    renderSyncPage('Connected — your words are now backed by this Gist.');
+  }catch(e){
+    console.error(e);
+    renderSyncPage('Could not create the Gist. Check your token and try again.', true);
+  }
+}
+async function handleConnectExisting(){
+  const token = (document.getElementById('syncTokenInput').value || '').trim();
+  const gistId = (document.getElementById('syncGistIdInput').value || '').trim();
+  if(!token || !gistId){ renderSyncPage('Enter both your token and the Gist ID.', true); return; }
+  renderSyncPage('Connecting…');
+  try{
+    await connectToExistingGist(token, gistId);
+    await loadAndRenderList();
+    renderSyncPage('Connected — pulled your words from the Gist.');
+  }catch(e){
+    console.error(e);
+    renderSyncPage('Could not connect. Check your token and Gist ID.', true);
+  }
+}
+async function handleSyncNow(){
+  renderSyncPage('Syncing…');
+  try{
+    await pullGistNow();
+    await loadAndRenderList();
+    renderSyncPage('Up to date.');
+  }catch(e){
+    console.error(e);
+    renderSyncPage('Sync failed — check your connection.', true);
+  }
+}
+function handleDisconnectSync(){
+  disconnectSync();
+  renderSyncPage('Disconnected. Your words stay on this device only from now on.');
+}
 const INDEX_KEY = 'dict:index';
 
 async function getIndex(){
@@ -1761,11 +2038,25 @@ function navPractice(){
 /* ---------------- wire up ---------------- */
 document.getElementById('fabAdd').addEventListener('click', openAdd);
 document.getElementById('menuBtn').addEventListener('click', openDrawer);
+document.getElementById('syncBtn').addEventListener('click', openSyncPage);
 window.addEventListener('scroll', ()=>{
   document.getElementById('topHeader').classList.toggle('scrolled', window.scrollY > 4);
 });
 
-loadAndRenderList();
+async function initApp(){
+  const token = getSyncToken(), gistId = getSyncGistId();
+  if(token && gistId){
+    syncEnabled = true;
+    try{
+      await pullGistNow();
+    }catch(e){
+      console.error('initial gist pull failed, using local cache', e);
+      gistData = collectLocalDictData();
+    }
+  }
+  await loadAndRenderList();
+}
+initApp();
 </script>
 </body>
 </html>
