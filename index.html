@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Dictionary (Copy)</title>
+<style>
+  :root{
+    --paper:#faf8f3;
+    --paper-raised:#ffffff;
+    --ink:#241f1a;
+    --ink-soft:#6b6258;
+    --line:#e6e0d4;
+    --accent:#7a5c3e;
+    --accent-soft:#efe6d8;
+    --tamil:#8a6a49;
+    --danger:#a1503e;
+    box-sizing:border-box;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#1c1a17;
+      --paper-raised:#242220;
+      --ink:#efe9df;
+      --ink-soft:#a89e90;
+      --line:#3a352e;
+      --accent:#d3ab7e;
+      --accent-soft:#332c22;
+      --tamil:#d3ab7e;
+      --danger:#e08e7a;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  .app{
+    max-width:760px;
+    margin:0 auto;
+    min-height:100%;
+    padding:0 20px 100px;
+    position:relative;
+  }
+  header.top{
+    position:sticky;
+    top:env(safe-area-inset-top,0px);
+    background:var(--paper);
+    padding:28px 0 14px;
+    z-index:5;
+    border-bottom:1px solid transparent;
+  }
+  header.top.scrolled{ border-bottom-color:var(--line); }
+  h1.title{
+    font-family: Georgia, "Times New Roman", serif;
+    font-size:28px;
+    font-weight:600;
+    margin:0 0 4px;
+    letter-spacing:-0.01em;
+  }
+  .sub{ color:var(--ink-soft); font-size:13.5px; margin:0; }
+  .title-row{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    margin-bottom:16px;
+  }
+  .practice-btn{
+    flex:none;
+    background:var(--accent-soft); color:var(--accent);
+    border:none; border-radius:20px; padding:9px 16px;
+    font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit;
+  }
+  .practice-btn:hover{ filter:brightness(0.97); }
+  .menu-btn{
+    flex:none; background:none; border:1px solid var(--line); border-radius:9px;
+    width:38px; height:38px; display:flex; align-items:center; justify-content:center;
+    color:var(--ink); cursor:pointer;
+  }
+  .menu-btn:hover{ background:var(--accent-soft); }
+
+  /* drawer nav (desktop / tablet) */
+  .drawer-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.35);
+    opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:39;
+  }
+  .drawer-overlay.open{ opacity:1; pointer-events:auto; }
+  .drawer{
+    position:fixed; top:0; left:0; bottom:0; width:230px; max-width:78vw;
+    background:var(--paper-raised); border-right:1px solid var(--line);
+    transform:translateX(-100%); transition:transform .22s ease; z-index:40;
+    padding:calc(22px + env(safe-area-inset-top,0px)) 12px 20px;
+    display:flex; flex-direction:column; gap:2px;
+  }
+  .drawer.open{ transform:translateX(0); }
+  .drawer-title{
+    font-family: Georgia, "Times New Roman", serif; font-size:17px; font-weight:600;
+    padding:0 10px 14px;
+  }
+  .drawer-item{
+    display:flex; align-items:center; gap:10px; text-align:left;
+    background:none; border:none; border-radius:8px; padding:11px 10px;
+    font-size:14.5px; color:var(--ink); cursor:pointer; font-family:inherit;
+  }
+  .drawer-item:hover{ background:var(--accent-soft); }
+  .drawer-item.active{ background:var(--accent-soft); color:var(--accent); font-weight:600; }
+  .drawer-item .ic{ font-size:17px; }
+
+  /* bottom tab bar (mobile) */
+  .bottom-nav{
+    display:none;
+    position:fixed; left:0; right:0; bottom:0;
+    background:var(--paper-raised); border-top:1px solid var(--line);
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));
+    align-items:center; justify-content:space-around; z-index:25;
+  }
+  .bn-item{
+    background:none; border:none; display:flex; flex-direction:column; align-items:center; gap:2px;
+    color:var(--ink-soft); font-size:11px; padding:4px 16px; cursor:pointer; font-family:inherit;
+  }
+  .bn-item .ic{ font-size:20px; line-height:1; }
+  .bn-item.active{ color:var(--accent); }
+  .bn-add{
+    background:var(--accent); color:#fff; border:none; border-radius:50%;
+    width:50px; height:50px; font-size:26px; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    margin-top:-24px; box-shadow:0 4px 12px rgba(0,0,0,.25); cursor:pointer;
+  }
+
+  @media (max-width: 640px){
+    .menu-btn{ display:none; }
+    .bottom-nav{ display:flex; }
+    .fab{ display:none; }
+    .app{ padding-bottom:92px; }
+  }
+  .search{
+    display:flex; align-items:center; gap:8px;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:9px 12px;
+  }
+  .search input{
+    border:none; outline:none; background:transparent;
+    font-size:14.5px; color:var(--ink); width:100%;
+    font-family:inherit;
+  }
+  .search svg{ flex:none; color:var(--ink-soft); }
+
+  .count-row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin:22px 0 8px;
+    font-size:12px; color:var(--ink-soft); letter-spacing:.02em;
+  }
+
+  .word-list{ list-style:none; margin:0; padding:0; }
+  .word-card{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px;
+    padding:14px 4px;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+  }
+  .word-card:hover .word-base{ color:var(--accent); }
+  .word-main{ min-width:0; }
+  .word-base{
+    font-family: Georgia, "Times New Roman", serif;
+    font-size:18px;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .word-pos{
+    font-size:11px; color:var(--ink-soft); font-style:italic; margin-left:8px;
+  }
+  .word-meaning{
+    font-size:13px; color:var(--tamil); margin-top:2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .chev{ color:var(--ink-soft); flex:none; }
+
+  .empty{
+    text-align:center; padding:70px 20px; color:var(--ink-soft);
+  }
+  .empty .big{ font-size:40px; margin-bottom:10px; }
+  .empty b{ color:var(--ink); }
+
+  .fab{
+    position:fixed;
+    right:calc(24px + env(safe-area-inset-right,0px));
+    bottom:calc(24px + env(safe-area-inset-bottom,0px));
+    width:56px; height:56px; border-radius:50%;
+    background:var(--accent); color:#fff;
+    border:none; box-shadow:0 6px 16px rgba(0,0,0,.22);
+    font-size:28px; line-height:56px; text-align:center; cursor:pointer;
+    z-index:20;
+  }
+  .fab:active{ transform:scale(.94); }
+
+  /* Add page */
+  .page{
+    position:fixed; inset:0; background:var(--paper);
+    transform:translateX(100%);
+    transition:transform .22s ease;
+    z-index:30;
+    overflow-y:auto;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  #addPage{ z-index:31; }
+  #detailPage{ z-index:30; }
+  #quizPage{ z-index:32; }
+  #resultsPage{ z-index:33; }
+  #dayPracticePage{ z-index:34; }
+  .page.open{ transform:translateX(0); }
+  .page-inner{ max-width:760px; margin:0 auto; padding:20px 20px 60px; }
+  .page-head{
+    display:flex; align-items:center; gap:14px; padding:8px 0 18px;
+    position:sticky; top:env(safe-area-inset-top,0px); background:var(--paper); z-index:2;
+  }
+  .icon-btn{
+    background:none; border:none; cursor:pointer; color:var(--ink);
+    display:flex; align-items:center; justify-content:center;
+    width:34px; height:34px; border-radius:8px;
+  }
+  .icon-btn:hover{ background:var(--accent-soft); }
+  .page-head h2{ font-size:16px; margin:0; font-weight:600; }
+
+  textarea#pasteBox{
+    width:100%; min-height:340px; resize:vertical;
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:10px;
+    padding:14px; font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size:13px; line-height:1.55; color:var(--ink); outline:none;
+  }
+  textarea#pasteBox:focus{ border-color:var(--accent); }
+  .hint{ font-size:12.5px; color:var(--ink-soft); margin:10px 2px 16px; line-height:1.5; }
+
+  .primary-btn{
+    background:var(--accent); color:#fff; border:none; border-radius:9px;
+    padding:12px 18px; font-size:14.5px; font-weight:600; cursor:pointer;
+    font-family:inherit;
+  }
+  .primary-btn:disabled{ opacity:.4; cursor:default; }
+  .ghost-btn{
+    background:none; border:1px solid var(--line); color:var(--ink);
+    border-radius:9px; padding:12px 18px; font-size:14.5px; cursor:pointer; font-family:inherit;
+  }
+  .btn-row{ display:flex; gap:10px; margin-top:4px; }
+  #status{ font-size:13px; margin-top:12px; min-height:18px; }
+  #status.err{ color:var(--danger); }
+  #status.ok{ color:#3d7a4d; }
+
+  .preview-list{ margin-top:18px; }
+  .preview-chip{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--accent-soft); color:var(--accent);
+    border-radius:20px; padding:5px 12px 5px 12px; font-size:13px; margin:0 6px 6px 0;
+  }
+
+  /* Detail page */
+  .word-head{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .word-head h1{
+    font-family: Georgia, "Times New Roman", serif;
+    font-size:34px; margin:0; font-weight:600;
+  }
+  .speak-btn{
+    border:1px solid var(--line); background:var(--paper-raised); color:var(--accent);
+    border-radius:50%; width:30px; height:30px; cursor:pointer; flex:none;
+    display:inline-flex; align-items:center; justify-content:center; vertical-align:middle;
+  }
+  .speak-btn:hover{ background:var(--accent-soft); }
+  .speak-btn svg{ width:14px; height:14px; }
+  .detail-pos{ color:var(--ink-soft); font-style:italic; font-size:14px; }
+
+  .entry-body h3{
+    font-size:12px; text-transform:none; letter-spacing:.02em;
+    color:var(--accent); margin:26px 0 8px; font-weight:700;
+    border-bottom:1px solid var(--line); padding-bottom:6px;
+  }
+  .entry-body p{ margin:6px 0; line-height:1.65; font-size:15px; }
+  .entry-body p.tamil-line{ color:var(--tamil); }
+  .entry-body ul{ margin:6px 0; padding-left:20px; }
+  .entry-body li{ margin:4px 0; line-height:1.6; font-size:15px; }
+  .entry-body table{ border-collapse:collapse; width:100%; margin:8px 0; font-size:14px; }
+  .entry-body th, .entry-body td{ border:1px solid var(--line); padding:7px 10px; text-align:left; }
+  .entry-body th{ background:var(--accent-soft); font-weight:600; }
+  .entry-body strong{ color:var(--ink); }
+
+  /* label / value fields (Pronunciation, Tamil Meaning, English Meaning, etc.) */
+  .field{ margin:16px 0; }
+  .field-label{
+    font-size:12.5px; font-weight:600; color:var(--ink-soft);
+    margin-bottom:3px;
+  }
+  .field-value{ font-size:15.5px; line-height:1.6; color:var(--ink); }
+  .field-value.tamil-line{ color:var(--tamil); }
+
+  .field-pronunciation .field-value{
+    display:inline-block;
+    font-size:19px; font-weight:600; color:var(--accent);
+    background:var(--accent-soft);
+    padding:6px 14px; border-radius:8px;
+  }
+  .field-tamil-meaning .field-value{ font-size:17px; }
+  .field-related-verb{
+    padding:8px 12px; border:1px solid var(--line); border-radius:8px;
+    display:inline-flex; gap:6px; align-items:baseline; margin-bottom:10px;
+  }
+  .field-related-verb .field-label{ margin:0; }
+  .field-related-verb .field-value{ font-size:15px; }
+
+  .qa-card{
+    background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:10px; padding:10px 14px; margin:10px 0;
+  }
+  .qa-card p{ margin:4px 0; }
+
+  .delete-row{ margin-top:36px; padding-top:16px; border-top:1px solid var(--line); }
+  .delete-row button{ color:var(--danger); background:none; border:none; font-size:13px; cursor:pointer; }
+
+  /* Quiz */
+  .quiz-progress{ font-size:12.5px; color:var(--ink-soft); margin-bottom:14px; }
+  .quiz-card{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:14px;
+    padding:32px 24px; text-align:center;
+  }
+  .quiz-word{
+    font-family: Georgia, "Times New Roman", serif;
+    font-size:34px; font-weight:600; margin-bottom:6px;
+  }
+  .quiz-subtitle{ color:var(--ink-soft); font-size:14px; margin-bottom:22px; }
+  .quiz-answer{
+    text-align:left; background:var(--accent-soft); border-radius:10px;
+    padding:16px 18px; margin-bottom:20px;
+  }
+  .quiz-answer .field-label{ color:var(--accent); }
+  .quiz-answer .field-value{ font-size:16px; }
+  .quiz-examples{ text-align:left; margin-bottom:20px; }
+  .quiz-examples .examples-label{
+    font-size:12.5px; font-weight:600; color:var(--ink-soft); margin:0 2px 8px;
+  }
+  .quiz-examples .qa-card{ background:var(--paper); text-align:left; }
+  .quiz-examples .qa-card p{ font-size:14px; }
+  .quiz-card .primary-btn{ width:100%; padding:13px; font-size:15px; }
+  .quiz-empty{ text-align:center; padding:60px 20px; color:var(--ink-soft); }
+  .quiz-empty .big{ font-size:40px; margin-bottom:12px; }
+  .quiz-empty p{ margin-bottom:18px; line-height:1.6; }
+
+  .correctness-row{ display:flex; gap:10px; }
+  .correct-btn, .wrong-btn{
+    flex:1; border:none; border-radius:9px; padding:13px; font-size:14.5px;
+    font-weight:600; cursor:pointer; font-family:inherit; color:#fff;
+  }
+  .correct-btn{ background:#3d7a4d; }
+  .correct-btn:active{ filter:brightness(0.92); }
+  .wrong-btn{ background:var(--danger); }
+  .wrong-btn:active{ filter:brightness(0.92); }
+
+  /* Practice mode menu */
+  .practice-menu{ display:flex; flex-direction:column; gap:12px; margin-top:6px; }
+  .practice-mode-card{
+    display:flex; align-items:center; gap:14px; text-align:left;
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:12px;
+    padding:16px; cursor:pointer; font-family:inherit; width:100%;
+  }
+  .practice-mode-card:hover{ border-color:var(--accent); }
+  .practice-mode-card:active{ transform:scale(.99); }
+  .pm-icon{ font-size:26px; flex:none; width:36px; text-align:center; }
+  .pm-title{ font-weight:600; font-size:15.5px; color:var(--ink); }
+  .pm-sub{ font-size:12.5px; color:var(--ink-soft); margin-top:2px; }
+
+  /* Results / calendar */
+  .cal-summary{
+    display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:20px;
+  }
+  .cal-stat{
+    background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:10px; padding:12px 8px; text-align:center;
+  }
+  .cal-stat .num{ font-size:20px; font-weight:700; }
+  .cal-stat.correct .num{ color:#3d7a4d; }
+  .cal-stat.wrong .num{ color:var(--danger); }
+  .cal-stat .lbl{ font-size:11px; color:var(--ink-soft); margin-top:2px; }
+
+  .cal-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .cal-header button{
+    background:var(--accent-soft); color:var(--accent); border:none; border-radius:8px;
+    width:32px; height:32px; font-size:16px; cursor:pointer;
+  }
+  .cal-header h3{ font-size:15px; margin:0; font-weight:600; }
+
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .cal-dow{ text-align:center; font-size:10.5px; color:var(--ink-soft); padding-bottom:4px; }
+  .cal-day{
+    aspect-ratio:1; border:1px solid var(--line); border-radius:8px;
+    background:var(--paper-raised); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; cursor:pointer; font-family:inherit;
+    padding:2px; color:var(--ink);
+  }
+  .cal-day.empty{ visibility:hidden; cursor:default; }
+  .cal-day .cal-daynum{ font-size:12px; }
+  .cal-day .cal-dots{ font-size:7.5px; margin-top:2px; line-height:1.1; color:var(--ink-soft); }
+  .cal-day.cal-good{ background:rgba(61,122,77,0.16); border-color:rgba(61,122,77,0.35); }
+  .cal-day.cal-excellent{ background:rgba(196,155,40,0.22); border-color:rgba(196,155,40,0.5); }
+  .cal-day.cal-bad{ background:rgba(161,80,62,0.16); border-color:rgba(161,80,62,0.35); }
+  .cal-day.selected{ outline:2px solid var(--accent); outline-offset:1px; }
+  .cal-day.cal-future{
+    color:var(--ink-soft); opacity:0.35; cursor:default; background:transparent;
+  }
+
+  .day-detail{
+    margin-top:18px; background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:10px; padding:14px 16px;
+  }
+  .day-detail-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+  .day-detail h4{ margin:0; font-size:14px; font-weight:600; }
+  .day-badge{
+    font-size:11.5px; font-weight:600; padding:4px 10px; border-radius:12px; white-space:nowrap;
+  }
+  .day-badge.excellent{ background:rgba(196,155,40,0.2); color:#8a6d1c; }
+  .day-badge.good{ background:rgba(61,122,77,0.16); color:#3d7a4d; }
+  .day-badge.bad{ background:rgba(161,80,62,0.16); color:var(--danger); }
+  .day-detail .wrong-list{ margin-top:10px; }
+  .day-detail .wrong-chip{
+    display:inline-block; background:var(--accent-soft); color:var(--accent);
+    border-radius:14px; padding:4px 10px; font-size:12px; margin:0 6px 6px 0;
+    cursor:pointer;
+  }
+
+  /* shared word-stats bits (detail page card + popup) */
+  .ws-row{ display:flex; gap:10px; margin-bottom:12px; }
+  .ws-stat{ flex:1; text-align:center; background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:10px 6px; }
+  .ws-stat .num{ font-size:18px; font-weight:700; }
+  .ws-stat.correct .num{ color:#3d7a4d; }
+  .ws-stat.wrong .num{ color:var(--danger); }
+  .ws-stat .lbl{ font-size:10.5px; color:var(--ink-soft); margin-top:2px; }
+  .ws-badge{ display:inline-block; font-size:12px; font-weight:600; padding:5px 12px; border-radius:12px; }
+  .ws-badge.excellent{ background:rgba(196,155,40,0.2); color:#8a6d1c; }
+  .ws-badge.good{ background:rgba(61,122,77,0.16); color:#3d7a4d; }
+  .ws-badge.bad{ background:rgba(161,80,62,0.16); color:var(--danger); }
+  .ws-badge.none{ background:var(--accent-soft); color:var(--ink-soft); }
+
+  .word-stats-card{
+    margin:18px 0; padding:14px 16px; background:var(--paper-raised);
+    border:1px solid var(--line); border-radius:10px;
+  }
+
+  .head-actions{ margin-left:auto; display:flex; align-items:center; gap:10px; }
+  .status-chip{
+    flex:none; border-radius:20px; padding:6px 13px;
+    display:inline-flex; align-items:center; gap:5px;
+    font-weight:700; font-size:12.5px; line-height:1; color:#fff;
+    animation: chip-glow 1.6s ease-in-out infinite;
+  }
+  @keyframes chip-glow{
+    0%,100%{ box-shadow:0 0 5px 1px var(--glow-color, transparent); }
+    50%{ box-shadow:0 0 14px 5px var(--glow-color, transparent); }
+  }
+  .status-chip.bad{ background:var(--danger); --glow-color: rgba(161,80,62,.75); }
+  .status-chip.good{ background:#3d7a4d; --glow-color: rgba(61,122,77,.75); }
+  .status-chip.excellent{
+    background:radial-gradient(circle at 35% 30%, #ffe9a8, #d4af37);
+    color:#4a3a0a; font-size:13.5px; --glow-color: rgba(212,175,55,.9);
+  }
+
+  /* quick popup */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.45);
+    opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:49;
+  }
+  .modal-overlay.open{ opacity:1; pointer-events:auto; }
+  .stats-modal{
+    position:fixed; left:50%; top:50%; transform:translate(-50%,-46%) scale(.96);
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:14px;
+    padding:20px; width:min(320px, 84vw);
+    opacity:0; pointer-events:none; transition:opacity .18s ease, transform .18s ease;
+    z-index:50; box-shadow:0 12px 32px rgba(0,0,0,.25);
+  }
+  .stats-modal.open{ opacity:1; pointer-events:auto; transform:translate(-50%,-50%) scale(1); }
+  .stats-modal h4{
+    margin:0 0 12px; font-family: Georgia, "Times New Roman", serif; font-size:20px; font-weight:600;
+  }
+
+  .day-word-list{ margin-top:6px; }
+  .day-word-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:13px 4px; border-bottom:1px solid var(--line);
+  }
+  .dw-word{
+    font-family: Georgia, "Times New Roman", serif; font-size:16px; font-weight:600; color:var(--ink);
+  }
+  .dw-sub{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .dw-counts{ display:flex; gap:8px; font-size:13px; font-weight:600; flex:none; }
+  .dw-correct{ color:#3d7a4d; }
+  .dw-wrong{ color:var(--danger); }
+</style>
+</head>
+<body>
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<nav class="drawer" id="drawer">
+  <div class="drawer-title">My Dictionary</div>
+  <button class="drawer-item active" data-tab="home" onclick="navHome()">
+    <span class="ic">📖</span> My Words
+  </button>
+  <button class="drawer-item" data-tab="practice" onclick="navPractice()">
+    <span class="ic">🎲</span> Practice
+  </button>
+  <button class="drawer-item" data-tab="results" onclick="navResults()">
+    <span class="ic">📅</span> My Results
+  </button>
+</nav>
+
+<div class="app">
+  <header class="top" id="topHeader">
+    <div class="title-row">
+      <div>
+        <h1 class="title">My Dictionary</h1>
+        <p class="sub" id="subCount">0 words learned</p>
+      </div>
+      <button class="menu-btn" id="menuBtn" title="Menu" aria-label="Menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="searchInput" type="text" placeholder="Search your words…" oninput="renderList()">
+    </div>
+  </header>
+
+  <ul class="word-list" id="wordList"></ul>
+  <div class="empty" id="emptyState" style="display:none;">
+    <div class="big">📖</div>
+    <p>No words yet. Tap <b>+</b> to add your first word.</p>
+  </div>
+</div>
+
+<nav class="bottom-nav" id="bottomNav">
+  <button class="bn-item active" data-tab="home" onclick="navHome()">
+    <span class="ic">📖</span><span>Words</span>
+  </button>
+  <button class="bn-add" onclick="openAdd()" title="Add word" aria-label="Add word">+</button>
+  <button class="bn-item" data-tab="practice" onclick="navPractice()">
+    <span class="ic">🎲</span><span>Practice</span>
+  </button>
+  <button class="bn-item" data-tab="results" onclick="navResults()">
+    <span class="ic">📅</span><span>Results</span>
+  </button>
+</nav>
+
+<button class="fab" id="fabAdd" title="Add word">+</button>
+
+<!-- ADD PAGE -->
+<div class="page" id="addPage">
+  <div class="page-inner">
+    <div class="page-head">
+      <button class="icon-btn" onclick="closeAdd()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </button>
+      <h2 id="pageTitleAdd">Add word</h2>
+    </div>
+    <textarea id="pasteBox" placeholder="Paste your formatted word entry here (one or more, separated by ---)…"></textarea>
+    <p class="hint" id="pageHint">Paste your usual format — it auto-fills the word, meanings, examples, verb forms and related words. You can paste several entries at once, separated by a line of dashes (---).</p>
+    <div class="btn-row">
+      <button class="primary-btn" id="saveBtn" onclick="handleSave()">Save to dictionary</button>
+      <button class="ghost-btn" onclick="closeAdd()">Cancel</button>
+    </div>
+    <div id="status"></div>
+    <div class="preview-list" id="previewList"></div>
+  </div>
+</div>
+
+<!-- DETAIL PAGE -->
+<div class="page" id="detailPage">
+  <div class="page-inner">
+    <div class="page-head">
+      <button class="icon-btn" onclick="closeDetail()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </button>
+      <h2>Word</h2>
+    </div>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<!-- QUIZ PAGE -->
+<div class="page" id="quizPage">
+  <div class="page-inner">
+    <div class="page-head">
+      <button class="icon-btn" onclick="closeQuiz()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </button>
+      <h2 id="quizPageTitle">Practice</h2>
+    </div>
+    <div id="quizContent"></div>
+  </div>
+</div>
+
+<!-- RESULTS PAGE -->
+<div class="page" id="resultsPage">
+  <div class="page-inner">
+    <div class="page-head">
+      <button class="icon-btn" onclick="closeResults()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </button>
+      <h2>My Results</h2>
+    </div>
+    <div id="resultsContent"></div>
+  </div>
+</div>
+
+<!-- DAY PRACTICE PAGE (per-day word breakdown) -->
+<div class="page" id="dayPracticePage">
+  <div class="page-inner">
+    <div class="page-head">
+      <button class="icon-btn" onclick="closeDayPractice()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </button>
+      <h2 id="dayPracticeTitle">Day</h2>
+    </div>
+    <div id="dayPracticeContent"></div>
+  </div>
+</div>
+
+<!-- QUICK WORD STATS POPUP -->
+<div class="modal-overlay" id="statsModalOverlay" onclick="closeWordStatsModal()"></div>
+<div class="stats-modal" id="statsModal">
+  <div id="statsModalContent"></div>
+  <button class="ghost-btn" style="width:100%; margin-top:14px;" onclick="closeWordStatsModal()">Close</button>
+</div>
+
+<script>
+/* ---------------- storage helpers (browser local storage, per-device) ---------------- */
+async function storageGet(key){
+  try{ const v = window.localStorage.getItem(key); return v === null ? null : v; }
+  catch(e){ console.error('storage get failed', e); return null; }
+}
+async function storageSet(key, value){
+  try{ window.localStorage.setItem(key, value); return true; }
+  catch(e){ console.error('storage set failed', e); return null; }
+}
+async function storageDelete(key){
+  try{ window.localStorage.removeItem(key); return true; }
+  catch(e){ return null; }
+}
+
+const INDEX_KEY = 'dict:index';
+
+async function getIndex(){
+  const raw = await storageGet(INDEX_KEY);
+  if(!raw) return [];
+  try{ return JSON.parse(raw); } catch(e){ return []; }
+}
+async function saveIndex(list){
+  await storageSet(INDEX_KEY, JSON.stringify(list));
+}
+
+function slugify(w){
+  return w.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || ('w'+Date.now());
+}
+
+/* ---------------- tiny markdown -> html parser ---------------- */
+const TAMIL_RE = /[\u0B80-\u0BFF]/;
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// inline: bold **x** then italic *x*
+function inline(s){
+  s = escapeHtml(s);
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
+  return s;
+}
+
+function stripMd(s){
+  return s.replace(/\*\*/g,'').replace(/\*/g,'').replace(/`/g,'').trim();
+}
+
+function mdToHtml(body){
+  const lines = body.split('\n');
+  let html = '';
+  let i = 0;
+  let listBuf = [];
+  function flushList(){
+    if(listBuf.length){
+      html += '<ul>' + listBuf.map(t=> '<li>' + inline(t) + '</li>').join('') + '</ul>';
+      listBuf = [];
+    }
+  }
+  while(i < lines.length){
+    let line = lines[i];
+    const trimmed = line.trim();
+
+    if(trimmed === ''){ flushList(); i++; continue; }
+
+    // skip horizontal rules / leftover title lines
+    if(/^-{3,}$/.test(trimmed)){ flushList(); i++; continue; }
+    if(/^#\s/.test(trimmed)){ flushList(); i++; continue; } // main title already used
+
+    // skip Part of Speech (shown under the title already)
+    if(/^\*\*Part of Speech:?\*\*/i.test(trimmed)){ flushList(); i++; continue; }
+
+    // Related verb: pull it out here, re-inserted just above Verb Forms
+    if(/^\*\*Related verb:?\*\*/i.test(trimmed)){ flushList(); i++; continue; }
+
+    // label-only line (e.g. "**Pronunciation:**") -> group with the line(s) that follow
+    // into a clear label/value field, instead of two same-weight paragraphs
+    let labelMatch = trimmed.match(/^\*\*([^*]+):\*\*\s*$/);
+    if(labelMatch){
+      flushList();
+      const label = stripMd(labelMatch[1]);
+      let valueLines = [];
+      let j = i + 1;
+      while(j < lines.length){
+        const t2 = lines[j].trim();
+        if(t2 === '') break;
+        if(/^\*\*([^*]+):\*\*\s*$/.test(t2)) break;
+        if(/^#{1,3}\s/.test(t2)) break;
+        if(/^\|/.test(t2)) break;
+        valueLines.push(lines[j]);
+        j++;
+      }
+      const valueRaw = valueLines.join(' ').trim();
+      if(valueRaw){
+        const valuePlain = stripMd(valueRaw);
+        const isTamilVal = TAMIL_RE.test(valuePlain);
+        const labelSlug = label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+        html += `<div class="field field-${labelSlug}"><div class="field-label">${escapeHtml(label)}</div>` +
+                `<div class="field-value${isTamilVal ? ' tamil-line' : ''}">${inline(valueRaw)}</div></div>`;
+        i = j;
+        continue;
+      }
+      // label with nothing after it (rare) — fall through and show the label plainly
+      html += `<div class="field field-${label.toLowerCase().replace(/[^a-z0-9]+/g,'-')}"><div class="field-label">${escapeHtml(label)}</div></div>`;
+      i++; continue;
+    }
+
+    // headings ### or ##
+    let hMatch = trimmed.match(/^#{2,3}\s*(.+)/);
+    if(hMatch){
+      flushList();
+      html += '<h3>' + inline(stripMd(hMatch[1])) + '</h3>';
+      i++; continue;
+    }
+
+    // table
+    if(/^\|/.test(trimmed)){
+      flushList();
+      let rows = [];
+      while(i < lines.length && /^\|/.test(lines[i].trim())){
+        rows.push(lines[i].trim());
+        i++;
+      }
+      // drop separator row like |---|---|
+      rows = rows.filter(r => !/^\|[\s\-:|]+\|$/.test(r));
+      if(rows.length){
+        html += '<table>';
+        rows.forEach((r, idx)=>{
+          const cells = r.split('|').slice(1,-1).map(c=>c.trim());
+          const tag = idx===0 ? 'th' : 'td';
+          html += '<tr>' + cells.map(c=>`<${tag}>${inline(stripMd(c))}</${tag}>`).join('') + '</tr>';
+        });
+        html += '</table>';
+      }
+      continue;
+    }
+
+    // bullet
+    let bMatch = trimmed.match(/^[\*\-]\s+(.+)/);
+    if(bMatch && !/^\*\*/.test(trimmed)){
+      listBuf.push(bMatch[1]);
+      i++; continue;
+    }
+
+    // Q&A example trio -> group into one card
+    if(/^\*\*Q\b/i.test(trimmed)){
+      flushList();
+      let qaLines = [];
+      let j = i;
+      while(j < lines.length && lines[j].trim() !== ''){
+        qaLines.push(lines[j]);
+        j++;
+      }
+      html += '<div class="qa-card">' + qaLines.map(l=>{
+        const t = l.trim();
+        const p = stripMd(t);
+        const isTam = TAMIL_RE.test(p);
+        return `<p${isTam ? ' class="tamil-line"' : ''}>${inline(t)}</p>`;
+      }).join('') + '</div>';
+      i = j;
+      continue;
+    }
+
+    // plain paragraph
+    flushList();
+    const plain = stripMd(trimmed);
+    const isTamil = TAMIL_RE.test(plain);
+    const cls = isTamil ? ' class="tamil-line"' : '';
+    html += `<p${cls}>` + inline(trimmed) + '</p>';
+    i++;
+  }
+  flushList();
+  return html;
+}
+
+// pull out the Q&A example trios from raw text, for reuse in the practice quiz
+function extractExamples(raw){
+  const lines = raw.split('\n');
+  const examples = [];
+  let i = 0;
+  while(i < lines.length){
+    const t = lines[i].trim();
+    if(/^\*\*Q\b/i.test(t)){
+      let block = [];
+      let j = i;
+      while(j < lines.length && lines[j].trim() !== ''){
+        block.push(lines[j].trim());
+        j++;
+      }
+      let q = '', a = '', tamil = '';
+      block.forEach(l=>{
+        const plain = stripMd(l);
+        if(/^Q:?\s*/i.test(plain)) q = plain.replace(/^Q:?\s*/i,'').trim();
+        else if(/^A:?\s*/i.test(plain)) a = plain.replace(/^A:?\s*/i,'').trim();
+        else if(/^Tamil:?\s*/i.test(plain)) tamil = plain.replace(/^Tamil:?\s*/i,'').trim();
+      });
+      if(q || a) examples.push({ q, a, tamil });
+      i = j;
+    } else {
+      i++;
+    }
+  }
+  return examples;
+}
+
+function parseOneEntry(raw){
+  const text = raw.trim();
+  if(!text) return null;
+
+  const titleMatch = text.match(/^#\s*\*{0,2}(.+?)\*{0,2}\s*$/m);
+  if(!titleMatch) return null;
+  const word = stripMd(titleMatch[1]).trim();
+  if(!word) return null;
+
+  const posMatch = text.match(/\*\*Part of Speech:?\*\*\s*(.+)/i);
+  const pos = posMatch ? stripMd(posMatch[1]) : '';
+
+  const tamilMeaningMatch = text.match(/\*\*Tamil Meaning:?\*\*\s*\n?\s*(.+)/i);
+  const tamilMeaning = tamilMeaningMatch ? stripMd(tamilMeaningMatch[1]).slice(0,80) : '';
+
+  const englishMeaningMatch = text.match(/\*\*English Meaning:?\*\*\s*\n?\s*(.+)/i);
+  const englishMeaning = englishMeaningMatch ? stripMd(englishMeaningMatch[1]).slice(0,300) : '';
+
+  const relatedVerbMatch = text.match(/\*\*Related verb:?\*\*\s*(.+)/i);
+  const relatedVerb = relatedVerbMatch ? stripMd(relatedVerbMatch[1]) : '';
+
+  let bodyHtml = mdToHtml(text);
+
+  if(relatedVerb){
+    const insertHtml = `<div class="field field-related-verb"><div class="field-label">Related verb</div><div class="field-value">${inline(relatedVerb)}</div></div>`;
+    const marker = /<h3>([^<]*Verb Forms[^<]*)<\/h3>/i;
+    if(marker.test(bodyHtml)){
+      bodyHtml = bodyHtml.replace(marker, insertHtml + '<h3>$1</h3>');
+    } else {
+      bodyHtml += insertHtml;
+    }
+  }
+
+  return {
+    id: slugify(word),
+    word: word,
+    pos: pos,
+    tamilMeaning: tamilMeaning,
+    englishMeaning: englishMeaning,
+    examples: extractExamples(text),
+    html: bodyHtml,
+    raw: text,
+    savedAt: Date.now()
+  };
+}
+
+function parsePaste(raw){
+  const blocks = raw.split(/\n\s*-{3,}\s*\n/g);
+  const entries = [];
+  blocks.forEach(b=>{
+    const e = parseOneEntry(b);
+    if(e) entries.push(e);
+  });
+  return entries;
+}
+
+/* ---------------- speech ---------------- */
+function speakText(t){
+  try{
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(t);
+    u.lang = 'en-US';
+    u.rate = 0.92;
+    window.speechSynthesis.speak(u);
+  }catch(e){ console.error(e); }
+}
+
+/* ---------------- rendering: list ---------------- */
+let cachedIndex = [];
+
+async function loadAndRenderList(){
+  cachedIndex = await getIndex();
+  cachedIndex.sort((a,b)=> a.word.localeCompare(b.word));
+  renderList();
+}
+
+function renderList(){
+  const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+  const listEl = document.getElementById('wordList');
+  const emptyEl = document.getElementById('emptyState');
+  const filtered = cachedIndex.filter(e => !q || e.word.toLowerCase().includes(q));
+
+  document.getElementById('subCount').textContent =
+    cachedIndex.length + (cachedIndex.length === 1 ? ' word learned' : ' words learned');
+
+  listEl.innerHTML = '';
+  if(filtered.length === 0){
+    emptyEl.style.display = 'block';
+    emptyEl.querySelector('p').innerHTML = q
+      ? 'No matches for "<b>'+escapeHtml(q)+'</b>".'
+      : 'No words yet. Tap <b>+</b> to add your first word.';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  filtered.forEach(e=>{
+    const li = document.createElement('li');
+    li.className = 'word-card';
+    li.onclick = ()=> openDetail(e.id);
+    li.ondblclick = (ev)=>{ ev.preventDefault(); openWordStatsModal(e.id, e.word); };
+    li.innerHTML = `
+      <div class="word-main">
+        <span class="word-base">${escapeHtml(e.word)}</span>
+        <span class="word-pos">${escapeHtml(e.pos||'')}</span>
+        <div class="word-meaning">${escapeHtml(e.tamilMeaning||'')}</div>
+      </div>
+      <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    `;
+    listEl.appendChild(li);
+  });
+}
+
+/* ---------------- add / edit page ---------------- */
+let editingId = null;
+
+function openAdd(){
+  editingId = null;
+  document.getElementById('pageTitleAdd').textContent = 'Add word';
+  document.getElementById('pageHint').style.display = '';
+  document.getElementById('saveBtn').textContent = 'Save to dictionary';
+  document.getElementById('addPage').classList.add('open');
+  document.getElementById('status').textContent = '';
+  document.getElementById('status').className = '';
+  document.getElementById('previewList').innerHTML = '';
+  document.getElementById('pasteBox').value = '';
+  setTimeout(()=> document.getElementById('pasteBox').focus(), 200);
+}
+function closeAdd(){
+  document.getElementById('addPage').classList.remove('open');
+  editingId = null;
+}
+
+function openEdit(){
+  if(!currentDetailEntry) return;
+  editingId = currentDetailEntry.id;
+  document.getElementById('pageTitleAdd').textContent = 'Edit word';
+  document.getElementById('pageHint').style.display = 'none';
+  document.getElementById('saveBtn').textContent = 'Save changes';
+  document.getElementById('status').textContent = '';
+  document.getElementById('status').className = '';
+  document.getElementById('previewList').innerHTML = '';
+  document.getElementById('pasteBox').value = currentDetailEntry.raw;
+  document.getElementById('addPage').classList.add('open');
+  setTimeout(()=> document.getElementById('pasteBox').focus(), 200);
+}
+
+async function handleSave(){
+  const raw = document.getElementById('pasteBox').value;
+  const statusEl = document.getElementById('status');
+  const btn = document.getElementById('saveBtn');
+
+  if(editingId){
+    const e = parseOneEntry(raw);
+    if(!e){
+      statusEl.className = 'err';
+      statusEl.textContent = "Couldn't find a word — make sure it starts with a line like \"# **Word**\".";
+      return;
+    }
+    const idx = await getIndex();
+    const idMap = new Map(idx.map(x => [x.id, x]));
+    const oldId = editingId;
+
+    if(e.id !== oldId && idMap.has(e.id)){
+      statusEl.className = 'err';
+      statusEl.textContent = `"${e.word}" already exists in your dictionary — edit that entry instead.`;
+      return;
+    }
+
+    btn.disabled = true;
+    statusEl.className = '';
+    statusEl.textContent = 'Saving…';
+
+    if(e.id !== oldId){
+      idMap.delete(oldId);
+      await storageDelete('dict:entry:' + oldId);
+    }
+    await storageSet('dict:entry:' + e.id, JSON.stringify(e));
+    idMap.set(e.id, { id: e.id, word: e.word, pos: e.pos, tamilMeaning: e.tamilMeaning, englishMeaning: e.englishMeaning, savedAt: e.savedAt });
+    const newIndex = Array.from(idMap.values());
+    await saveIndex(newIndex);
+
+    cachedIndex = newIndex;
+    renderList();
+
+    btn.disabled = false;
+    statusEl.className = 'ok';
+    statusEl.textContent = 'Saved changes.';
+    const savedId = e.id;
+    setTimeout(async ()=>{
+      document.getElementById('addPage').classList.remove('open');
+      editingId = null;
+      await openDetail(savedId);
+    }, 450);
+    return;
+  }
+
+  const entries = parsePaste(raw);
+  if(entries.length === 0){
+    statusEl.className = 'err';
+    statusEl.textContent = "Couldn't find a word — make sure it starts with a line like \"# **Word**\".";
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.className = '';
+  statusEl.textContent = 'Saving…';
+
+  const idx = await getIndex();
+  const idMap = new Map(idx.map(e => [e.id, e]));
+
+  const toSave = [];
+  const duplicates = [];
+  for(const e of entries){
+    if(idMap.has(e.id)) duplicates.push(e.word);
+    else toSave.push(e);
+  }
+
+  for(const e of toSave){
+    await storageSet('dict:entry:' + e.id, JSON.stringify(e));
+    idMap.set(e.id, { id: e.id, word: e.word, pos: e.pos, tamilMeaning: e.tamilMeaning, englishMeaning: e.englishMeaning, savedAt: e.savedAt });
+  }
+  const newIndex = Array.from(idMap.values());
+  await saveIndex(newIndex);
+
+  btn.disabled = false;
+
+  let msg = '';
+  if(toSave.length) msg += 'Saved ' + toSave.length + (toSave.length===1 ? ' word.' : ' words.');
+  if(duplicates.length){
+    const dupText = duplicates.length === 1
+      ? `"${duplicates[0]}" already exists in your dictionary.`
+      : `Already in your dictionary: ${duplicates.join(', ')}.`;
+    msg += (msg ? ' ' : '') + dupText;
+  }
+  statusEl.className = toSave.length ? 'ok' : 'err';
+  statusEl.textContent = msg || 'Nothing to save.';
+
+  document.getElementById('previewList').innerHTML = toSave.map(e =>
+    `<span class="preview-chip">${escapeHtml(e.word)}</span>`).join('');
+  document.getElementById('pasteBox').value = duplicates.length && !toSave.length ? raw : '';
+
+  cachedIndex = newIndex;
+  renderList();
+
+  if(toSave.length){
+    setTimeout(()=>{ closeAdd(); }, duplicates.length ? 1400 : 700);
+  }
+}
+
+/* ---------------- detail page ---------------- */
+let currentDetailEntry = null;
+
+async function openDetail(id){
+  const raw = await storageGet('dict:entry:' + id);
+  if(!raw) return;
+  const e = JSON.parse(raw);
+  currentDetailEntry = e;
+  const content = document.getElementById('detailContent');
+  const safeWord = e.word.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+
+  const wStats = await getWordStats();
+  const ws = wStats[id] || { correct: 0, wrong: 0 };
+  const status = dayStatus(ws.correct, ws.wrong);
+  const chipHtml = status
+    ? (status.cls === 'excellent'
+        ? `<div class="status-chip excellent" title="${status.label}"><span>${ws.correct}</span>★</div>`
+        : `<div class="status-chip ${status.cls}" title="${status.label}"><span>${ws.wrong}/${ws.correct}</span>${status.cls === 'good' ? 'G' : 'B'}</div>`)
+    : '';
+
+  content.innerHTML = `
+    <div class="word-head">
+      <h1>${escapeHtml(e.word)}</h1>
+      <button class="speak-btn" onclick="speakText('${safeWord}')" title="Listen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      </button>
+      <div class="head-actions">
+        ${chipHtml}
+        <button class="ghost-btn" style="padding:7px 14px; font-size:13px;" onclick="openEdit()">Edit</button>
+      </div>
+    </div>
+    <div class="detail-pos">${escapeHtml(e.pos||'')}</div>
+    <div class="entry-body">${e.html}</div>
+    <div class="delete-row">
+      <button onclick="deleteEntry('${e.id}')">Remove this word</button>
+    </div>
+  `;
+  document.getElementById('detailPage').classList.add('open');
+}
+function closeDetail(){
+  document.getElementById('detailPage').classList.remove('open');
+  currentDetailEntry = null;
+}
+
+async function deleteEntry(id){
+  await storageDelete('dict:entry:' + id);
+  const idx = await getIndex();
+  const newIndex = idx.filter(e => e.id !== id);
+  await saveIndex(newIndex);
+  const wStats = await getWordStats();
+  if(wStats[id]){
+    delete wStats[id];
+    await saveWordStats(wStats);
+  }
+  cachedIndex = newIndex;
+  renderList();
+  closeDetail();
+}
+
+/* ---------------- daily practice quiz ---------------- */
+const QUIZ_TODAY_KEY = 'dict:quizToday';
+const QUIZ_HISTORY_KEY = 'dict:quizHistory';
+
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function daysBetween(a, b){
+  return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+}
+
+async function getQuizHistory(){
+  const raw = await storageGet(QUIZ_HISTORY_KEY);
+  if(!raw) return [];
+  try{ return JSON.parse(raw); } catch(e){ return []; }
+}
+async function saveQuizHistory(list){
+  await storageSet(QUIZ_HISTORY_KEY, JSON.stringify(list));
+}
+
+let quizWords = [];
+let quizIndexNum = 0;
+let quizRevealed = false;
+let quizMode = 'random';
+
+const PRACTICE_MODES = {
+  smart:    { title: 'Smart Random',            icon: '🧠' },
+  random:   { title: 'Random Practice',         icon: '🎲' },
+  wrong:    { title: 'Focus on Mistakes',        icon: '🔁' },
+  mastered: { title: 'Review Mastered Words',   icon: '⭐' }
+};
+
+/* Smart Random: no word repeats within SMART_REPEAT_GAP_DAYS days,
+   and among what's eligible, words practiced the fewest times get first preference. */
+const SMART_QUIZ_HISTORY_KEY = 'dict:smartQuizHistory';
+const SMART_REPEAT_GAP_DAYS = 10;
+const SMART_QUIZ_SIZE = 5;
+
+async function getSmartQuizHistory(){
+  const raw = await storageGet(SMART_QUIZ_HISTORY_KEY);
+  if(!raw) return [];
+  try{ return JSON.parse(raw); } catch(e){ return []; }
+}
+async function saveSmartQuizHistory(list){
+  await storageSet(SMART_QUIZ_HISTORY_KEY, JSON.stringify(list));
+}
+async function getSmartEligiblePool(){
+  const idx = await getIndex();
+  const today = todayStr();
+  let history = await getSmartQuizHistory();
+  history = history.filter(h => daysBetween(h.date, today) < SMART_REPEAT_GAP_DAYS);
+  const usedIds = new Set();
+  history.forEach(h => (h.wordIds||[]).forEach(id => usedIds.add(id)));
+  return idx.filter(e => !usedIds.has(e.id));
+}
+// Sort ascending by how many times each word has been practiced (least-practiced first),
+// shuffling within each equal-count group so ties aren't always in the same order.
+function rankByLeastPracticed(pool, wStats){
+  const withCounts = pool.map(e=>{
+    const ws = wStats[e.id] || { correct: 0, wrong: 0 };
+    return { e, total: (ws.correct||0) + (ws.wrong||0) };
+  });
+  withCounts.sort((a,b)=> a.total - b.total);
+  let i = 0;
+  while(i < withCounts.length){
+    let j = i;
+    while(j < withCounts.length && withCounts[j].total === withCounts[i].total) j++;
+    const shuffled = shuffleArr(withCounts.slice(i,j));
+    for(let k=0;k<shuffled.length;k++) withCounts[i+k] = shuffled[k];
+    i = j;
+  }
+  return withCounts.map(x => x.e);
+}
+
+async function openPracticeMenu(){
+  document.getElementById('quizPage').classList.add('open');
+  document.getElementById('quizPageTitle').textContent = 'Practice';
+  const el = document.getElementById('quizContent');
+
+  if(cachedIndex.length === 0){
+    el.innerHTML = `<div class="quiz-empty"><div class="big">🎲</div><p>Add a few words first, then come back to practice them.</p></div>`;
+    return;
+  }
+
+  el.innerHTML = `<p style="color:var(--ink-soft); text-align:center; padding:40px 0;">Loading…</p>`;
+
+  const wStats = await getWordStats();
+  let wrongCount = 0, masteredCount = 0;
+  cachedIndex.forEach(e=>{
+    const ws = wStats[e.id] || { correct: 0, wrong: 0 };
+    const st = dayStatus(ws.correct, ws.wrong);
+    if(st && st.cls === 'bad') wrongCount++;
+    else if(st && (st.cls === 'good' || st.cls === 'excellent')) masteredCount++;
+  });
+  const smartEligibleCount = (await getSmartEligiblePool()).length;
+
+  el.innerHTML = `
+    <p class="quiz-subtitle" style="text-align:left; margin-bottom:16px;">Choose how you'd like to practice.</p>
+    <div class="practice-menu">
+      <button class="practice-mode-card" onclick="openQuiz('smart')">
+        <div class="pm-icon">🧠</div>
+        <div>
+          <div class="pm-title">Smart Random</div>
+          <div class="pm-sub">No repeats within ${SMART_REPEAT_GAP_DAYS} days, least-practiced words first (${smartEligibleCount} eligible now).</div>
+        </div>
+      </button>
+      <button class="practice-mode-card" onclick="openQuiz('random')">
+        <div class="pm-icon">🎲</div>
+        <div>
+          <div class="pm-title">Random Practice</div>
+          <div class="pm-sub">A fresh mix from your whole dictionary (${cachedIndex.length} word${cachedIndex.length===1?'':'s'}).</div>
+        </div>
+      </button>
+      <button class="practice-mode-card" onclick="openQuiz('wrong')">
+        <div class="pm-icon">🔁</div>
+        <div>
+          <div class="pm-title">Focus on Mistakes</div>
+          <div class="pm-sub">${wrongCount} word${wrongCount===1?'':'s'} you've been getting wrong.</div>
+        </div>
+      </button>
+      <button class="practice-mode-card" onclick="openQuiz('mastered')">
+        <div class="pm-icon">⭐</div>
+        <div>
+          <div class="pm-title">Review Mastered Words</div>
+          <div class="pm-sub">${masteredCount} word${masteredCount===1?'':'s'} you already know well (good or excellent).</div>
+        </div>
+      </button>
+    </div>
+  `;
+}
+
+async function openQuiz(mode){
+  quizMode = mode || 'random';
+  document.getElementById('quizPage').classList.add('open');
+  document.getElementById('quizPageTitle').textContent = (PRACTICE_MODES[quizMode] || PRACTICE_MODES.random).title;
+  document.getElementById('quizContent').innerHTML = '<p style="color:var(--ink-soft); text-align:center; padding:60px 0;">Loading…</p>';
+  await loadOrCreateQuiz(quizMode);
+  renderQuiz();
+}
+function closeQuiz(){
+  document.getElementById('quizPage').classList.remove('open');
+  setActiveNav('home');
+}
+
+async function getPracticePool(mode){
+  const idx = await getIndex();
+  if(mode === 'random') return idx.slice();
+  const wStats = await getWordStats();
+  return idx.filter(e => {
+    const ws = wStats[e.id] || { correct: 0, wrong: 0 };
+    const st = dayStatus(ws.correct, ws.wrong);
+    if(!st) return false;
+    if(mode === 'wrong') return st.cls === 'bad';
+    if(mode === 'mastered') return st.cls === 'good' || st.cls === 'excellent';
+    return false;
+  });
+}
+
+function shuffleArr(arr){
+  const a = arr.slice();
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+async function loadQuizWordsFromEntries(entries){
+  quizWords = [];
+  for(const e of entries){
+    const raw = await storageGet('dict:entry:' + e.id);
+    if(raw){
+      try{
+        const parsed = JSON.parse(raw);
+        if(!parsed.examples) parsed.examples = extractExamples(parsed.raw || '');
+        quizWords.push(parsed);
+      } catch(err){}
+    }
+  }
+}
+
+async function loadOrCreateQuiz(mode){
+  if(mode === 'smart'){
+    const today = todayStr();
+    const wStats = await getWordStats();
+    const eligible = await getSmartEligiblePool();
+    const wordIds = rankByLeastPracticed(eligible, wStats).slice(0, SMART_QUIZ_SIZE).map(e => e.id);
+
+    if(wordIds.length){
+      let smartHistory = await getSmartQuizHistory();
+      smartHistory = smartHistory.filter(h => daysBetween(h.date, today) < SMART_REPEAT_GAP_DAYS);
+      smartHistory.push({ date: today, wordIds });
+      await saveSmartQuizHistory(smartHistory);
+    }
+
+    await loadQuizWordsFromEntries(wordIds.map(id => ({ id })));
+    quizIndexNum = 0;
+    quizRevealed = false;
+    return;
+  }
+
+  if(mode !== 'random'){
+    // Focused modes (wrong / mastered): always a fresh shuffle of the matching pool, no weekly-repeat limits.
+    const pool = await getPracticePool(mode);
+    const picked = shuffleArr(pool).slice(0, 10);
+    await loadQuizWordsFromEntries(picked);
+    quizIndexNum = 0;
+    quizRevealed = false;
+    return;
+  }
+
+  const today = todayStr();
+  let todayData = null;
+  const todayRaw = await storageGet(QUIZ_TODAY_KEY);
+  if(todayRaw){
+    try{ todayData = JSON.parse(todayRaw); } catch(e){ todayData = null; }
+  }
+
+  const idx = await getIndex();
+  let history = await getQuizHistory();
+  history = history.filter(h => h.date !== today && daysBetween(h.date, today) < 7);
+
+  const usedIds = new Set();
+  history.forEach(h => (h.wordIds || []).forEach(id => usedIds.add(id)));
+
+  function shuffledPool(excludeIds){
+    let pool = idx.filter(e => !usedIds.has(e.id) && !excludeIds.has(e.id));
+    return shuffleArr(pool);
+  }
+
+  let wordIds;
+  if(todayData && todayData.date === today){
+    wordIds = todayData.wordIds.slice();
+    // top up today's set if fewer than 5 were picked and more words exist now
+    // (e.g. new words were added to the dictionary later the same day)
+    if(wordIds.length < 5){
+      const existing = new Set(wordIds);
+      const extra = shuffledPool(existing).slice(0, 5 - wordIds.length).map(e => e.id);
+      wordIds = wordIds.concat(extra);
+    }
+  } else {
+    wordIds = shuffledPool(new Set()).slice(0, 5).map(e => e.id);
+  }
+
+  todayData = { date: today, wordIds };
+  await storageSet(QUIZ_TODAY_KEY, JSON.stringify(todayData));
+  const hIdx = history.findIndex(h => h.date === today);
+  if(hIdx >= 0) history[hIdx] = todayData; else history.push(todayData);
+  await saveQuizHistory(history);
+
+  const entries = wordIds.map(id => ({ id }));
+  await loadQuizWordsFromEntries(entries);
+  quizIndexNum = 0;
+  quizRevealed = false;
+}
+
+function renderQuiz(){
+  const el = document.getElementById('quizContent');
+
+  if(cachedIndex.length === 0){
+    el.innerHTML = `<div class="quiz-empty"><div class="big">🎲</div><p>Add a few words first, then come back to practice them.</p></div>`;
+    return;
+  }
+  if(quizWords.length === 0){
+    let icon = '✅', msg;
+    if(quizMode === 'wrong'){
+      msg = "No words need practice right now — nice work! Words you get wrong will show up here.";
+    } else if(quizMode === 'mastered'){
+      icon = '⭐';
+      msg = "No mastered words yet. Keep practicing and words you know well (good or excellent) will appear here.";
+    } else if(quizMode === 'smart'){
+      icon = '🧠';
+      msg = `Every word has already been practiced in the last ${SMART_REPEAT_GAP_DAYS} days — nothing new to serve up right now. Check back later, or try Random Practice.`;
+    } else {
+      msg = "No new words to practice right now — everything you have was already asked this week. Check back tomorrow!";
+    }
+    el.innerHTML = `<div class="quiz-empty"><div class="big">${icon}</div><p>${msg}</p>
+      <button class="ghost-btn" onclick="openPracticeMenu()">Back to practice modes</button></div>`;
+    return;
+  }
+  if(quizIndexNum >= quizWords.length){
+    el.innerHTML = `<div class="quiz-empty"><div class="big">🎉</div>
+      <p>Nice! You've gone through ${quizWords.length} word${quizWords.length===1?'':'s'}.</p>
+      <div class="btn-row" style="justify-content:center;">
+        <button class="primary-btn" onclick="openPracticeMenu()">Practice again</button>
+        <button class="ghost-btn" onclick="closeQuiz()">Done</button>
+      </div></div>`;
+    return;
+  }
+
+  const w = quizWords[quizIndexNum];
+  const examples = w.examples || [];
+  const examplesHtml = examples.length ? `
+    <div class="quiz-examples">
+      <div class="examples-label">Example${examples.length===1?'':'s'}</div>
+      ${examples.map(ex => `
+        <div class="qa-card">
+          <p><strong>Q:</strong> ${escapeHtml(ex.q)}</p>
+          ${ex.a ? `<p><strong>A:</strong> ${escapeHtml(ex.a)}</p>` : ''}
+          ${quizRevealed && ex.tamil ? `<p class="tamil-line"><strong>Tamil:</strong> ${escapeHtml(ex.tamil)}</p>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
+  el.innerHTML = `
+    <div class="quiz-progress">${(PRACTICE_MODES[quizMode] || PRACTICE_MODES.random).icon} Question ${quizIndexNum+1} of ${quizWords.length}</div>
+    <div class="quiz-card">
+      <div class="quiz-word">${escapeHtml(w.word)}</div>
+      <div class="quiz-subtitle">What does this mean?</div>
+      ${quizRevealed ? `
+        <div class="quiz-answer">
+          <div class="field-label">English Meaning</div>
+          <div class="field-value">${escapeHtml(w.englishMeaning || '—')}</div>
+          <div class="field-label" style="margin-top:14px;">Tamil Meaning</div>
+          <div class="field-value tamil-line">${escapeHtml(w.tamilMeaning || '—')}</div>
+        </div>
+        ${examplesHtml}
+        <div class="quiz-subtitle" style="margin-bottom:12px;">Was your answer correct?</div>
+        <div class="correctness-row">
+          <button class="correct-btn" onclick="recordAnswerAndNext(true)">✓ Correct</button>
+          <button class="wrong-btn" onclick="recordAnswerAndNext(false)">✗ Wrong</button>
+        </div>
+      ` : `
+        ${examplesHtml}
+        <button class="primary-btn" onclick="quizReveal()">Show answer</button>
+      `}
+    </div>
+  `;
+}
+
+function quizReveal(){ quizRevealed = true; renderQuiz(); }
+function quizNext(){ quizIndexNum++; quizRevealed = false; renderQuiz(); }
+
+/* ---------------- results tracking (correct/wrong per day + per word) ---------------- */
+const STATS_KEY = 'dict:quizStats';
+const WORD_STATS_KEY = 'dict:wordStats';
+
+async function getStats(){
+  const raw = await storageGet(STATS_KEY);
+  if(!raw) return {};
+  try{ return JSON.parse(raw); } catch(e){ return {}; }
+}
+async function saveStats(stats){
+  await storageSet(STATS_KEY, JSON.stringify(stats));
+}
+async function getWordStats(){
+  const raw = await storageGet(WORD_STATS_KEY);
+  if(!raw) return {};
+  try{ return JSON.parse(raw); } catch(e){ return {}; }
+}
+async function saveWordStats(stats){
+  await storageSet(WORD_STATS_KEY, JSON.stringify(stats));
+}
+async function recordAnswer(word, correct, wordId){
+  const today = todayStr();
+  const stats = await getStats();
+  if(!stats[today]) stats[today] = { correct: 0, wrong: 0, wrongWords: [], words: {} };
+  if(!stats[today].words) stats[today].words = {};
+
+  if(correct){
+    stats[today].correct = (stats[today].correct||0) + 1;
+  } else {
+    stats[today].wrong = (stats[today].wrong||0) + 1;
+    stats[today].wrongWords = stats[today].wrongWords || [];
+    stats[today].wrongWords.push(word);
+    if(stats[today].wrongWords.length > 50) stats[today].wrongWords.shift();
+  }
+
+  const key = wordId || word;
+  if(!stats[today].words[key]) stats[today].words[key] = { word: word, correct: 0, wrong: 0 };
+  stats[today].words[key].word = word;
+  if(correct) stats[today].words[key].correct = (stats[today].words[key].correct||0) + 1;
+  else stats[today].words[key].wrong = (stats[today].words[key].wrong||0) + 1;
+
+  await saveStats(stats);
+
+  if(wordId){
+    const wStats = await getWordStats();
+    if(!wStats[wordId]) wStats[wordId] = { correct: 0, wrong: 0 };
+    if(correct) wStats[wordId].correct = (wStats[wordId].correct||0) + 1;
+    else wStats[wordId].wrong = (wStats[wordId].wrong||0) + 1;
+    await saveWordStats(wStats);
+  }
+}
+async function recordAnswerAndNext(correct){
+  const w = quizWords[quizIndexNum];
+  if(w) await recordAnswer(w.word, correct, w.id);
+  quizNext();
+}
+
+/* ---------------- My Results (calendar view) ---------------- */
+let calMonth = new Date();
+let selectedCalDay = null;
+
+function navResults(){
+  closeDrawer();
+  setActiveNav('results');
+  openResults();
+}
+async function openResults(){
+  document.getElementById('resultsPage').classList.add('open');
+  calMonth = new Date();
+  calMonth.setDate(1);
+  selectedCalDay = null;
+  await renderResults();
+}
+function closeResults(){
+  document.getElementById('resultsPage').classList.remove('open');
+  setActiveNav('home');
+}
+function calPrev(){ calMonth.setMonth(calMonth.getMonth()-1); renderResults(); }
+function calNext(){ calMonth.setMonth(calMonth.getMonth()+1); renderResults(); }
+function selectCalDay(dateStr){
+  selectedCalDay = (selectedCalDay === dateStr) ? null : dateStr;
+  renderResults();
+}
+
+function dayStatus(correct, wrong){
+  const total = (correct||0) + (wrong||0);
+  if(total === 0) return null;
+  const acc = correct / total;
+  if(acc === 1) return { label: 'Excellent', cls: 'excellent', emoji: '🌟' };
+  if(acc >= 0.75) return { label: 'Good', cls: 'good', emoji: '👍' };
+  return { label: 'Needs practice', cls: 'bad', emoji: '💪' };
+}
+
+async function openWordStatsModal(id, fallbackWord){
+  let word = fallbackWord || '';
+  let exists = false;
+  if(id){
+    const raw = await storageGet('dict:entry:' + id);
+    if(raw){
+      try{ word = JSON.parse(raw).word; exists = true; } catch(e){}
+    }
+  }
+  const content = document.getElementById('statsModalContent');
+  if(exists){
+    const wStats = await getWordStats();
+    const ws = wStats[id] || { correct: 0, wrong: 0 };
+    const status = dayStatus(ws.correct, ws.wrong);
+    content.innerHTML = `
+      <h4>${escapeHtml(word)}</h4>
+      <div class="ws-row">
+        <div class="ws-stat correct"><div class="num">${ws.correct}</div><div class="lbl">Correct</div></div>
+        <div class="ws-stat wrong"><div class="num">${ws.wrong}</div><div class="lbl">Wrong</div></div>
+      </div>
+      ${status ? `<div class="ws-badge ${status.cls}">${status.emoji} ${status.label}</div>` : `<div class="ws-badge none">Not practiced yet</div>`}
+    `;
+  } else {
+    content.innerHTML = `
+      <h4>${escapeHtml(word || 'Word')}</h4>
+      <div style="color:var(--ink-soft); font-size:14px;">This word isn't in your dictionary anymore, so its practice stats aren't available.</div>
+    `;
+  }
+  document.getElementById('statsModalOverlay').classList.add('open');
+  document.getElementById('statsModal').classList.add('open');
+}
+function closeWordStatsModal(){
+  document.getElementById('statsModalOverlay').classList.remove('open');
+  document.getElementById('statsModal').classList.remove('open');
+}
+function handleWrongChipDblClick(el){
+  const word = el.getAttribute('data-word');
+  const found = cachedIndex.find(e => e.word === word);
+  openWordStatsModal(found ? found.id : null, word);
+}
+
+async function renderResults(){
+  const stats = await getStats();
+  const el = document.getElementById('resultsContent');
+  if(!el) return;
+
+  let totalCorrect = 0, totalWrong = 0;
+  Object.values(stats).forEach(d => { totalCorrect += d.correct||0; totalWrong += d.wrong||0; });
+  const totalAttempts = totalCorrect + totalWrong;
+  const acc = totalAttempts ? Math.round(totalCorrect/totalAttempts*100) : 0;
+
+  const y = calMonth.getFullYear(), m = calMonth.getMonth();
+  const monthLabel = calMonth.toLocaleDateString('en-US', { month:'long', year:'numeric' });
+  const firstDow = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const dowHtml = ['S','M','T','W','T','F','S'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const today = todayStr();
+
+  let cells = '';
+  for(let i=0;i<firstDow;i++) cells += `<div class="cal-day empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const isFuture = dateStr > today;
+    if(isFuture){
+      cells += `<div class="cal-day cal-future"><span class="cal-daynum">${d}</span></div>`;
+      continue;
+    }
+    const data = stats[dateStr];
+    const status = data ? dayStatus(data.correct||0, data.wrong||0) : null;
+    const cls = status ? 'cal-' + status.cls : '';
+    const dots = status ? `<span class="cal-dots">${data.correct||0}✓ ${data.wrong||0}✗</span>` : '';
+    const sel = selectedCalDay === dateStr ? ' selected' : '';
+    cells += `<button class="cal-day ${cls}${sel}" onclick="selectCalDay('${dateStr}')" ondblclick="openDayPractice('${dateStr}')"><span class="cal-daynum">${d}</span>${dots}</button>`;
+  }
+
+  let detailHtml = '';
+  if(selectedCalDay){
+    const label = new Date(selectedCalDay+'T00:00:00').toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+    const d = stats[selectedCalDay];
+    const status = d ? dayStatus(d.correct||0, d.wrong||0) : null;
+    if(status){
+      const dayTotal = (d.correct||0) + (d.wrong||0);
+      detailHtml = `<div class="day-detail">
+        <div class="day-detail-head">
+          <h4>${label}</h4>
+          <span class="day-badge ${status.cls}">${status.emoji} ${status.label}</span>
+        </div>
+        <div>${d.correct||0} correct, ${d.wrong||0} wrong &middot; ${dayTotal} answered</div>
+        ${ (d.wrongWords && d.wrongWords.length) ? `<div class="wrong-list">${d.wrongWords.map(w=>`<span class="wrong-chip" data-word="${escapeHtml(w)}" ondblclick="handleWrongChipDblClick(this)">${escapeHtml(w)}</span>`).join('')}</div>` : '' }
+      </div>`;
+    } else {
+      detailHtml = `<div class="day-detail"><h4>${label}</h4><div style="color:var(--ink-soft);">No practice that day.</div></div>`;
+    }
+  }
+
+  el.innerHTML = `
+    <div class="cal-summary">
+      <div class="cal-stat correct"><div class="num">${totalCorrect}</div><div class="lbl">Correct</div></div>
+      <div class="cal-stat wrong"><div class="num">${totalWrong}</div><div class="lbl">Wrong</div></div>
+      <div class="cal-stat"><div class="num">${totalAttempts}</div><div class="lbl">Answered</div></div>
+      <div class="cal-stat"><div class="num">${acc}%</div><div class="lbl">Accuracy</div></div>
+    </div>
+    <div class="cal-header">
+      <button onclick="calPrev()">‹</button>
+      <h3>${monthLabel}</h3>
+      <button onclick="calNext()">›</button>
+    </div>
+    <div class="cal-grid">${dowHtml}${cells}</div>
+    ${detailHtml}
+  `;
+}
+
+/* ---------------- navigation (drawer + bottom tabs) ---------------- */
+function openDrawer(){
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+}
+function closeDrawer(){
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+function setActiveNav(which){
+  document.querySelectorAll('.bn-item[data-tab]').forEach(el =>
+    el.classList.toggle('active', el.dataset.tab === which));
+  document.querySelectorAll('.drawer-item[data-tab]').forEach(el =>
+    el.classList.toggle('active', el.dataset.tab === which));
+}
+async function openDayPractice(dateStr){
+  const stats = await getStats();
+  const data = stats[dateStr];
+  const label = new Date(dateStr+'T00:00:00').toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  document.getElementById('dayPracticeTitle').textContent = label;
+  const el = document.getElementById('dayPracticeContent');
+
+  if(!data || ((data.correct||0) + (data.wrong||0)) === 0){
+    el.innerHTML = `<div class="quiz-empty"><div class="big">📭</div><p>No practice on this day.</p></div>`;
+  } else {
+    const words = data.words ? Object.values(data.words) : [];
+    words.sort((a,b)=> ((b.correct||0)+(b.wrong||0)) - ((a.correct||0)+(a.wrong||0)));
+    const rowsHtml = words.map(w=>{
+      const total = (w.correct||0) + (w.wrong||0);
+      return `
+        <div class="day-word-row">
+          <div class="dw-main">
+            <div class="dw-word">${escapeHtml(w.word)}</div>
+            <div class="dw-sub">${total} time${total===1?'':'s'} practiced</div>
+          </div>
+          <div class="dw-counts">
+            <span class="dw-correct">${w.correct||0}✓</span>
+            <span class="dw-wrong">${w.wrong||0}✗</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="cal-summary" style="margin-bottom:20px;">
+        <div class="cal-stat correct"><div class="num">${data.correct||0}</div><div class="lbl">Correct</div></div>
+        <div class="cal-stat wrong"><div class="num">${data.wrong||0}</div><div class="lbl">Wrong</div></div>
+        <div class="cal-stat"><div class="num">${(data.correct||0)+(data.wrong||0)}</div><div class="lbl">Answered</div></div>
+        <div class="cal-stat"><div class="num">${words.length}</div><div class="lbl">Words</div></div>
+      </div>
+      <div class="day-word-list">${rowsHtml || '<p style="color:var(--ink-soft);">No per-word breakdown available for this day.</p>'}</div>
+    `;
+  }
+  document.getElementById('dayPracticePage').classList.add('open');
+}
+function closeDayPractice(){
+  document.getElementById('dayPracticePage').classList.remove('open');
+}
+
+function navHome(){
+  closeDrawer();
+  closeAdd();
+  closeDetail();
+  closeQuiz();
+  closeResults();
+  closeDayPractice();
+  setActiveNav('home');
+}
+function navPractice(){
+  closeDrawer();
+  setActiveNav('practice');
+  openPracticeMenu();
+}
+
+/* ---------------- wire up ---------------- */
+document.getElementById('fabAdd').addEventListener('click', openAdd);
+document.getElementById('menuBtn').addEventListener('click', openDrawer);
+window.addEventListener('scroll', ()=>{
+  document.getElementById('topHeader').classList.toggle('scrolled', window.scrollY > 4);
+});
+
+loadAndRenderList();
+</script>
+</body>
+</html>
