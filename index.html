@@ -158,6 +158,20 @@
   }
   .search svg{ flex:none; color:var(--ink-soft); }
 
+  /* sort bar */
+  .sort-row{ display:flex; gap:8px; margin-top:10px; }
+  .sort-row select{
+    flex:1; min-width:0; background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:10px; padding:9px 12px; font-size:14px; color:var(--ink);
+    font-family:inherit; outline:none;
+  }
+  .sort-dir{
+    flex:none; width:42px; background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:10px; color:var(--accent); font-size:18px; cursor:pointer;
+  }
+  .sort-dir:hover{ background:var(--accent-soft); }
+  .word-counts{ display:flex; gap:8px; font-size:12px; font-weight:600; }
+
   .count-row{
     display:flex; justify-content:space-between; align-items:baseline;
     margin:22px 0 8px;
@@ -563,6 +577,16 @@
     <div class="search">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input id="searchInput" type="text" placeholder="Search your words…" oninput="renderList()">
+    </div>
+    <div class="sort-row">
+      <select id="sortSelect" onchange="changeSort()">
+        <option value="alpha">Alphabet (A–Z)</option>
+        <option value="date">Date &amp; time added</option>
+        <option value="wrong">Most wrong</option>
+        <option value="correct">Most correct</option>
+        <option value="status">Status (Needs practice → Good → Excellent)</option>
+      </select>
+      <button class="sort-dir" id="sortDirBtn" onclick="toggleSortDir()" aria-label="Reverse order">↑</button>
     </div>
   </header>
 
@@ -1188,20 +1212,73 @@ function speakText(t){
   }catch(e){ console.error(e); }
 }
 
+/* ---------------- sorting (main word list) ---------------- */
+let sortMode = 'alpha', sortDir = 'asc';
+try{
+  sortMode = window.localStorage.getItem('pref:sortMode') || 'alpha';
+  sortDir  = window.localStorage.getItem('pref:sortDir')  || 'asc';
+}catch(e){}
+
+// alphabet & status start ascending; date / wrong / correct start with the highest first
+function defaultDirFor(m){ return (m === 'alpha' || m === 'status') ? 'asc' : 'desc'; }
+
+function updateSortDirBtn(){
+  const b = document.getElementById('sortDirBtn');
+  b.textContent = sortDir === 'asc' ? '↑' : '↓';
+  b.title = sortDir === 'asc' ? 'Ascending (low → high)' : 'Descending (high → low)';
+}
+function saveSortPref(){
+  try{
+    window.localStorage.setItem('pref:sortMode', sortMode);
+    window.localStorage.setItem('pref:sortDir', sortDir);
+  }catch(e){}
+}
+function changeSort(){
+  sortMode = document.getElementById('sortSelect').value;
+  sortDir = defaultDirFor(sortMode);
+  updateSortDirBtn(); saveSortPref(); renderList();
+}
+function toggleSortDir(){
+  sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  updateSortDirBtn(); saveSortPref(); renderList();
+}
+function statusRank(ws){
+  const st = dayStatus(ws.correct, ws.wrong);
+  if(!st) return 0;                       // not practiced yet (always kept at the end)
+  return st.cls === 'bad' ? 1 : (st.cls === 'good' ? 2 : 3);
+}
+function sortEntries(list, wStats){
+  const dir = sortDir === 'asc' ? 1 : -1;
+  const g = e => wStats[e.id] || { correct: 0, wrong: 0 };
+  const alpha = (a,b) => a.word.localeCompare(b.word);
+  return list.slice().sort((a,b)=>{
+    if(sortMode === 'alpha') return dir * alpha(a,b);
+    if(sortMode === 'date')  return dir * ((a.savedAt||0) - (b.savedAt||0)) || alpha(a,b);
+    const A = g(a), B = g(b);
+    if(sortMode === 'wrong')   return dir * ((A.wrong||0)   - (B.wrong||0))   || alpha(a,b);
+    if(sortMode === 'correct') return dir * ((A.correct||0) - (B.correct||0)) || alpha(a,b);
+    // status: Needs practice (1) -> Good (2) -> Excellent (3); unpracticed always last
+    const ra = statusRank(A), rb = statusRank(B);
+    if(ra === 0 && rb !== 0) return 1;
+    if(rb === 0 && ra !== 0) return -1;
+    return dir * (ra - rb) || ((B.wrong||0) - (A.wrong||0)) || alpha(a,b);
+  });
+}
+
 /* ---------------- rendering: list ---------------- */
 let cachedIndex = [];
 
 async function loadAndRenderList(){
   cachedIndex = await getIndex();
-  cachedIndex.sort((a,b)=> a.word.localeCompare(b.word));
-  renderList();
+  await renderList();
 }
 
-function renderList(){
+async function renderList(){
   const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
   const listEl = document.getElementById('wordList');
   const emptyEl = document.getElementById('emptyState');
-  const filtered = cachedIndex.filter(e => !q || e.word.toLowerCase().includes(q));
+  const wStats = await getWordStats();
+  const filtered = sortEntries(cachedIndex.filter(e => !q || e.word.toLowerCase().includes(q)), wStats);
 
   document.getElementById('subCount').textContent =
     cachedIndex.length + (cachedIndex.length === 1 ? ' word learned' : ' words learned');
@@ -1217,6 +1294,10 @@ function renderList(){
   emptyEl.style.display = 'none';
 
   filtered.forEach(e=>{
+    const ws = wStats[e.id];
+    const cnt = (ws && (ws.correct || ws.wrong))
+      ? `<div class="word-counts"><span style="color:#3d7a4d">${ws.correct||0}✓</span><span style="color:var(--danger)">${ws.wrong||0}✗</span></div>`
+      : '';
     const li = document.createElement('li');
     li.className = 'word-card';
     li.onclick = ()=> openDetail(e.id);
@@ -1227,7 +1308,10 @@ function renderList(){
         <span class="word-pos">${escapeHtml(e.pos||'')}</span>
         <div class="word-meaning">${escapeHtml(e.tamilMeaning||'')}</div>
       </div>
-      <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      <div style="display:flex;align-items:center;gap:10px;flex:none;">
+        ${cnt}
+        <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
     `;
     listEl.appendChild(li);
   });
@@ -1641,6 +1725,10 @@ async function loadOrCreateQuiz(mode){
     return;
   }
 
+  /* ---- Random Practice ----
+     - If today's current set is not finished yet, resume it.
+     - Once it's finished, the next click gives 5 brand-new words
+       (never used in the last 7 days, including earlier sets from today). */
   const today = todayStr();
   let todayData = null;
   const todayRaw = await storageGet(QUIZ_TODAY_KEY);
@@ -1648,40 +1736,29 @@ async function loadOrCreateQuiz(mode){
     try{ todayData = JSON.parse(todayRaw); } catch(e){ todayData = null; }
   }
 
+  if(todayData && todayData.date === today && !todayData.done && todayData.wordIds && todayData.wordIds.length){
+    await loadQuizWordsFromEntries(todayData.wordIds.map(id => ({ id })));
+    quizIndexNum = 0;
+    quizRevealed = false;
+    return;
+  }
+
   const idx = await getIndex();
   let history = await getQuizHistory();
-  history = history.filter(h => h.date !== today && daysBetween(h.date, today) < 7);
+  history = history.filter(h => daysBetween(h.date, today) < 7);
 
   const usedIds = new Set();
   history.forEach(h => (h.wordIds || []).forEach(id => usedIds.add(id)));
 
-  function shuffledPool(excludeIds){
-    let pool = idx.filter(e => !usedIds.has(e.id) && !excludeIds.has(e.id));
-    return shuffleArr(pool);
+  const wordIds = shuffleArr(idx.filter(e => !usedIds.has(e.id))).slice(0, 5).map(e => e.id);
+
+  if(wordIds.length){
+    await storageSet(QUIZ_TODAY_KEY, JSON.stringify({ date: today, wordIds, done: false }));
+    history.push({ date: today, wordIds });
+    await saveQuizHistory(history);
   }
 
-  let wordIds;
-  if(todayData && todayData.date === today){
-    wordIds = todayData.wordIds.slice();
-    // top up today's set if fewer than 5 were picked and more words exist now
-    // (e.g. new words were added to the dictionary later the same day)
-    if(wordIds.length < 5){
-      const existing = new Set(wordIds);
-      const extra = shuffledPool(existing).slice(0, 5 - wordIds.length).map(e => e.id);
-      wordIds = wordIds.concat(extra);
-    }
-  } else {
-    wordIds = shuffledPool(new Set()).slice(0, 5).map(e => e.id);
-  }
-
-  todayData = { date: today, wordIds };
-  await storageSet(QUIZ_TODAY_KEY, JSON.stringify(todayData));
-  const hIdx = history.findIndex(h => h.date === today);
-  if(hIdx >= 0) history[hIdx] = todayData; else history.push(todayData);
-  await saveQuizHistory(history);
-
-  const entries = wordIds.map(id => ({ id }));
-  await loadQuizWordsFromEntries(entries);
+  await loadQuizWordsFromEntries(wordIds.map(id => ({ id })));
   quizIndexNum = 0;
   quizRevealed = false;
 }
@@ -1762,7 +1839,22 @@ function renderQuiz(){
 }
 
 function quizReveal(){ quizRevealed = true; renderQuiz(); }
-function quizNext(){ quizIndexNum++; quizRevealed = false; renderQuiz(); }
+function quizNext(){
+  quizIndexNum++;
+  quizRevealed = false;
+  if(quizMode === 'random' && quizIndexNum >= quizWords.length) markRandomDone();
+  renderQuiz();
+}
+// mark today's Random set as finished so the next "Practice again" gives new words
+async function markRandomDone(){
+  try{
+    const raw = await storageGet(QUIZ_TODAY_KEY);
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    d.done = true;
+    await storageSet(QUIZ_TODAY_KEY, JSON.stringify(d));
+  }catch(e){}
+}
 
 /* ---------------- results tracking (correct/wrong per day + per word) ---------------- */
 const STATS_KEY = 'dict:quizStats';
@@ -2064,6 +2156,8 @@ async function initApp(){
   }
   await loadAndRenderList();
 }
+document.getElementById('sortSelect').value = sortMode;
+updateSortDirBtn();
 initApp();
 </script>
 </body>
