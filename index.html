@@ -172,6 +172,18 @@
   .sort-dir:hover{ background:var(--accent-soft); }
   .word-counts{ display:flex; gap:8px; font-size:12px; font-weight:600; }
 
+  /* meaning quiz (multiple choice) */
+  .mcq-options{ display:flex; flex-direction:column; gap:10px; text-align:left; }
+  .mcq-opt{
+    width:100%; text-align:left; background:var(--paper); color:var(--ink);
+    border:1px solid var(--line); border-radius:10px; padding:14px 16px;
+    font-size:16px; line-height:1.45; cursor:pointer; font-family:inherit;
+  }
+  .mcq-opt:hover:not(:disabled){ border-color:var(--accent); }
+  .mcq-opt:disabled{ cursor:default; opacity:1; color:var(--ink); }
+  .mcq-opt.correct{ background:rgba(61,122,77,0.18); border-color:#3d7a4d; }
+  .mcq-opt.wrong{ background:rgba(161,80,62,0.18); border-color:var(--danger); }
+
   .count-row{
     display:flex; justify-content:space-between; align-items:baseline;
     margin:22px 0 8px;
@@ -587,6 +599,9 @@
         <option value="status">Status (Needs practice → Good → Excellent)</option>
       </select>
       <button class="sort-dir" id="sortDirBtn" onclick="toggleSortDir()" aria-label="Reverse order">↑</button>
+    </div>
+    <div class="sort-row" id="posRow" style="display:none;">
+      <select id="posSelect" onchange="changePosFilter()" aria-label="Filter by part of speech"></select>
     </div>
   </header>
 
@@ -1213,10 +1228,10 @@ function speakText(t){
 }
 
 /* ---------------- sorting (main word list) ---------------- */
-let sortMode = 'alpha', sortDir = 'asc';
+let sortMode = 'date', sortDir = 'desc';
 try{
-  sortMode = window.localStorage.getItem('pref:sortMode') || 'alpha';
-  sortDir  = window.localStorage.getItem('pref:sortDir')  || 'asc';
+  sortMode = window.localStorage.getItem('pref:sortMode2') || 'date';
+  sortDir  = window.localStorage.getItem('pref:sortDir2')  || 'desc';
 }catch(e){}
 
 // alphabet & status start ascending; date / wrong / correct start with the highest first
@@ -1229,8 +1244,8 @@ function updateSortDirBtn(){
 }
 function saveSortPref(){
   try{
-    window.localStorage.setItem('pref:sortMode', sortMode);
-    window.localStorage.setItem('pref:sortDir', sortDir);
+    window.localStorage.setItem('pref:sortMode2', sortMode);
+    window.localStorage.setItem('pref:sortDir2', sortDir);
   }catch(e){}
 }
 function changeSort(){
@@ -1265,6 +1280,32 @@ function sortEntries(list, wStats){
   });
 }
 
+/* ---------------- part-of-speech filter ----------------
+   "Verb (Transitive Verb)" -> "Verb". The list is built from the words you actually saved,
+   so only parts of speech you have given will show up. */
+let posFilter = '';
+function basePos(e){
+  const p = (e.pos || '').replace(/\([^)]*\)/g, '').trim();
+  if(!p) return '';
+  return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+}
+function refreshPosFilter(){
+  const counts = {};
+  cachedIndex.forEach(e=>{ const p = basePos(e); if(p) counts[p] = (counts[p]||0) + 1; });
+  const names = Object.keys(counts).sort((a,b)=> a.localeCompare(b));
+  if(posFilter && !counts[posFilter]) posFilter = '';
+  const row = document.getElementById('posRow');
+  const sel = document.getElementById('posSelect');
+  row.style.display = names.length ? '' : 'none';
+  sel.innerHTML = `<option value="">All parts of speech — ${cachedIndex.length}</option>` +
+    names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)} — ${counts[n]}</option>`).join('');
+  sel.value = posFilter;
+}
+function changePosFilter(){
+  posFilter = document.getElementById('posSelect').value;
+  renderList();
+}
+
 /* ---------------- rendering: list ---------------- */
 let cachedIndex = [];
 
@@ -1278,7 +1319,10 @@ async function renderList(){
   const listEl = document.getElementById('wordList');
   const emptyEl = document.getElementById('emptyState');
   const wStats = await getWordStats();
-  const filtered = sortEntries(cachedIndex.filter(e => !q || e.word.toLowerCase().includes(q)), wStats);
+  refreshPosFilter();
+  const filtered = sortEntries(
+    cachedIndex.filter(e => (!q || e.word.toLowerCase().includes(q)) && (!posFilter || basePos(e) === posFilter)),
+    wStats);
 
   document.getElementById('subCount').textContent =
     cachedIndex.length + (cachedIndex.length === 1 ? ' word learned' : ' words learned');
@@ -1539,9 +1583,16 @@ let quizIndexNum = 0;
 let quizRevealed = false;
 let quizMode = 'random';
 
+/* Meaning Quiz: which meaning is shown in the 4 choices ('tamilMeaning' or 'englishMeaning') */
+const MCQ_FIELD = 'tamilMeaning';
+const MCQ_QUIZ_SIZE = 10;
+let mcqOptions = [];
+let mcqPicked = null;
+
 const PRACTICE_MODES = {
   smart:    { title: 'Smart Random',            icon: '🧠' },
   random:   { title: 'Random Practice',         icon: '🎲' },
+  meaning:  { title: 'Meaning Quiz',            icon: '🔤' },
   wrong:    { title: 'Focus on Mistakes',        icon: '🔁' },
   mastered: { title: 'Review Mastered Words',   icon: '⭐' }
 };
@@ -1609,6 +1660,7 @@ async function openPracticeMenu(){
     else if(st && (st.cls === 'good' || st.cls === 'excellent')) masteredCount++;
   });
   const smartEligibleCount = (await getSmartEligiblePool()).length;
+  const meaningCount = cachedIndex.filter(e => (e[MCQ_FIELD] || '').trim()).length;
 
   el.innerHTML = `
     <p class="quiz-subtitle" style="text-align:left; margin-bottom:16px;">Choose how you'd like to practice.</p>
@@ -1625,6 +1677,13 @@ async function openPracticeMenu(){
         <div>
           <div class="pm-title">Random Practice</div>
           <div class="pm-sub">A fresh mix from your whole dictionary (${cachedIndex.length} word${cachedIndex.length===1?'':'s'}).</div>
+        </div>
+      </button>
+      <button class="practice-mode-card" onclick="openQuiz('meaning')">
+        <div class="pm-icon">🔤</div>
+        <div>
+          <div class="pm-title">Meaning Quiz</div>
+          <div class="pm-sub">See the word, pick the right meaning from 4 choices — order is shuffled every time (${meaningCount} word${meaningCount===1?'':'s'} ready).</div>
         </div>
       </button>
       <button class="practice-mode-card" onclick="openQuiz('wrong')">
@@ -1656,6 +1715,7 @@ async function openQuiz(mode){
 function closeQuiz(){
   document.getElementById('quizPage').classList.remove('open');
   setActiveNav('home');
+  renderList();
 }
 
 async function getPracticePool(mode){
@@ -1696,6 +1756,25 @@ async function loadQuizWordsFromEntries(entries){
 }
 
 async function loadOrCreateQuiz(mode){
+  if(mode === 'meaning'){
+    const idx = await getIndex();
+    const valid = idx.filter(e => (e[MCQ_FIELD] || '').trim());
+    mcqPicked = null;
+    mcqOptions = [];
+    if(valid.length < 4){
+      quizWords = [];
+      quizIndexNum = 0;
+      quizRevealed = false;
+      return;
+    }
+    const picked = shuffleArr(valid).slice(0, MCQ_QUIZ_SIZE);   // new random words every time
+    await loadQuizWordsFromEntries(picked);
+    buildMcqOptions(valid);
+    quizIndexNum = 0;
+    quizRevealed = false;
+    return;
+  }
+
   if(mode === 'smart'){
     const today = todayStr();
     const wStats = await getWordStats();
@@ -1777,6 +1856,9 @@ function renderQuiz(){
     } else if(quizMode === 'mastered'){
       icon = '⭐';
       msg = "No mastered words yet. Keep practicing and words you know well (good or excellent) will appear here.";
+    } else if(quizMode === 'meaning'){
+      icon = '🔤';
+      msg = "Add at least 4 words that have a meaning, then come back for the Meaning Quiz.";
     } else if(quizMode === 'smart'){
       icon = '🧠';
       msg = `Every word has already been practiced in the last ${SMART_REPEAT_GAP_DAYS} days — nothing new to serve up right now. Check back later, or try Random Practice.`;
@@ -1796,6 +1878,8 @@ function renderQuiz(){
       </div></div>`;
     return;
   }
+
+  if(quizMode === 'meaning'){ renderMcq(); return; }
 
   const w = quizWords[quizIndexNum];
   const examples = w.examples || [];
@@ -1854,6 +1938,66 @@ async function markRandomDone(){
     d.done = true;
     await storageSet(QUIZ_TODAY_KEY, JSON.stringify(d));
   }catch(e){}
+}
+
+/* ---------------- Meaning Quiz (choose the correct meaning) ---------------- */
+function normMeaning(t){ return (t || '').trim().toLowerCase(); }
+
+function buildMcqOptions(valid){
+  mcqOptions = quizWords.map(w=>{
+    const correct = (w[MCQ_FIELD] || '').trim();
+    const seen = new Set([normMeaning(correct)]);
+    const wrong = [];
+    for(const e of shuffleArr(valid)){
+      if(e.id === w.id) continue;
+      const t = (e[MCQ_FIELD] || '').trim();
+      if(!t || seen.has(normMeaning(t))) continue;
+      seen.add(normMeaning(t));
+      wrong.push({ text: t, correct: false });
+      if(wrong.length === 3) break;
+    }
+    return shuffleArr([{ text: correct, correct: true }].concat(wrong));  // correct answer lands in a random spot
+  });
+}
+
+function renderMcq(){
+  const el = document.getElementById('quizContent');
+  const w = quizWords[quizIndexNum];
+  const opts = mcqOptions[quizIndexNum] || [];
+  const answered = mcqPicked !== null;
+  const tamilCls = MCQ_FIELD === 'tamilMeaning' ? ' tamil-line' : '';
+  el.innerHTML = `
+    <div class="quiz-progress">${PRACTICE_MODES.meaning.icon} Question ${quizIndexNum+1} of ${quizWords.length}</div>
+    <div class="quiz-card">
+      <div class="quiz-word">${escapeHtml(w.word)}</div>
+      <div class="quiz-subtitle">${escapeHtml(w.pos || '')}${w.pos ? ' · ' : ''}Choose the correct meaning</div>
+      <div class="mcq-options">
+        ${opts.map((o,i)=>{
+          let cls = 'mcq-opt' + tamilCls;
+          if(answered){
+            if(o.correct) cls += ' correct';
+            else if(i === mcqPicked) cls += ' wrong';
+          }
+          return `<button class="${cls}" ${answered ? 'disabled' : ''} onclick="mcqPick(${i})">${escapeHtml(o.text)}</button>`;
+        }).join('')}
+      </div>
+      ${answered ? `<button class="primary-btn" style="margin-top:18px;" onclick="mcqNext()">${quizIndexNum+1 >= quizWords.length ? 'Finish' : 'Next'}</button>` : ''}
+    </div>
+  `;
+}
+async function mcqPick(i){
+  if(mcqPicked !== null) return;
+  mcqPicked = i;
+  const w = quizWords[quizIndexNum];
+  const ok = !!(mcqOptions[quizIndexNum] && mcqOptions[quizIndexNum][i] && mcqOptions[quizIndexNum][i].correct);
+  renderMcq();
+  await recordAnswer(w.word, ok, w.id);   // counts in My Results and the word's status, like other modes
+}
+function mcqNext(){
+  mcqPicked = null;
+  quizIndexNum++;
+  quizRevealed = false;
+  renderQuiz();
 }
 
 /* ---------------- results tracking (correct/wrong per day + per word) ---------------- */
