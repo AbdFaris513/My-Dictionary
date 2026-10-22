@@ -346,6 +346,7 @@
   .entry-body th, .entry-body td{ border:1px solid var(--line); padding:7px 10px; text-align:left; }
   .entry-body th{ background:var(--accent-soft); font-weight:600; }
   .entry-body strong{ color:var(--ink); }
+  .entry-body hr.sec-divider{ border:none; border-top:2px dashed var(--line); margin:30px 0; }
 
   /* label / value fields (Pronunciation, Tamil Meaning, English Meaning, etc.) */
   .field{ margin:16px 0; }
@@ -1023,7 +1024,7 @@ function mdToHtml(body){
     if(trimmed === ''){ flushList(); i++; continue; }
 
     // skip horizontal rules / leftover title lines
-    if(/^-{3,}$/.test(trimmed)){ flushList(); i++; continue; }
+    if(/^-{3,}$/.test(trimmed)){ flushList(); html += '<hr class="sec-divider">'; i++; continue; }
     if(/^#\s/.test(trimmed)){ flushList(); i++; continue; } // main title already used
 
     // skip Part of Speech (shown under the title already)
@@ -1166,7 +1167,7 @@ function parseOneEntry(raw){
   const text = raw.trim();
   if(!text) return null;
 
-  const titleMatch = text.match(/^#\s*\*{0,2}(.+?)\*{0,2}\s*$/m);
+  const titleMatch = text.match(/^#(?!#)\s*\*{0,2}(.+?)\*{0,2}\s*$/m);
   if(!titleMatch) return null;
   const word = stripMd(titleMatch[1]).trim();
   if(!word) return null;
@@ -1209,7 +1210,24 @@ function parseOneEntry(raw){
 }
 
 function parsePaste(raw){
-  const blocks = raw.split(/\n\s*-{3,}\s*\n/g);
+  // A line of --- starts a NEW word only when the next line is a main title ("# Word").
+  // Any other --- is just a divider inside the same word (e.g. before "Other Parts of Speech").
+  const lines = raw.split('\n');
+  const blocks = [];
+  let cur = [];
+  for(let i = 0; i < lines.length; i++){
+    if(/^\s*-{3,}\s*$/.test(lines[i])){
+      let j = i + 1;
+      while(j < lines.length && lines[j].trim() === '') j++;
+      if(j >= lines.length || /^#(?!#)\s*\S/.test(lines[j].trim())){
+        blocks.push(cur.join('\n'));
+        cur = [];
+        continue;
+      }
+    }
+    cur.push(lines[i]);
+  }
+  blocks.push(cur.join('\n'));
   const entries = [];
   blocks.forEach(b=>{
     const e = parseOneEntry(b);
