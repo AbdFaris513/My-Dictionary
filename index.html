@@ -174,6 +174,32 @@
   .sort-dir:hover{ background:var(--accent-soft); }
   .word-counts{ display:flex; gap:8px; font-size:12px; font-weight:600; }
 
+  /* problem log (shows errors on screen, no DevTools needed) */
+  .err-fab{
+    position:fixed; left:16px; bottom:calc(16px + env(safe-area-inset-bottom,0px)); z-index:60;
+    background:var(--danger); color:#fff; border:none; border-radius:20px; padding:9px 14px;
+    font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
+    box-shadow:0 4px 12px rgba(0,0,0,.3);
+  }
+  @media (max-width: 640px){ .err-fab{ bottom:calc(76px + env(safe-area-inset-bottom,0px)); } }
+  .err-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:70;
+    display:none; align-items:center; justify-content:center; padding:16px;
+  }
+  .err-overlay.open{ display:flex; }
+  .err-panel{
+    background:var(--paper-raised); color:var(--ink); border:1px solid var(--line); border-radius:14px;
+    padding:16px; width:min(640px,100%); max-height:80vh; display:flex; flex-direction:column;
+  }
+  .err-panel h3{ margin:0; font-size:15px; }
+  .err-list{
+    overflow:auto; flex:1; margin:10px 0; font-family: ui-monospace, Consolas, monospace;
+    font-size:12px; line-height:1.5;
+  }
+  .err-item{ border-bottom:1px solid var(--line); padding:8px 0; white-space:pre-wrap; word-break:break-word; }
+  .err-item b{ color:var(--danger); }
+  .err-item i{ color:var(--ink-soft); font-style:normal; }
+
   /* meaning quiz (multiple choice) */
   .mcq-options{ display:flex; flex-direction:column; gap:10px; text-align:left; }
   .mcq-opt{
@@ -558,6 +584,78 @@
 </style>
 </head>
 <body>
+<script>
+/* ---- Problem log: catches errors anywhere in the app and shows them on screen ---- */
+(function(){
+  var logs = [], ui = null;
+  function esc(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function str(a){
+    try{
+      if(a && a.stack) return a.stack;
+      if(a && a.message) return a.message;
+      if(typeof a === 'object') return JSON.stringify(a);
+      return String(a);
+    }catch(e){ return String(a); }
+  }
+  function build(){
+    if(ui || !document.body) return;
+    var wrap = document.createElement('div');
+    wrap.innerHTML =
+      '<button class="err-fab" id="errFab" style="display:none"></button>' +
+      '<div class="err-overlay" id="errOverlay"><div class="err-panel">' +
+        '<h3>Problems log</h3>' +
+        '<div class="err-list" id="errList"></div>' +
+        '<div class="btn-row">' +
+          '<button class="ghost-btn" id="errCopy">Copy all</button>' +
+          '<button class="ghost-btn" id="errClear">Clear</button>' +
+          '<button class="primary-btn" id="errClose">Close</button>' +
+        '</div>' +
+      '</div></div>';
+    document.body.appendChild(wrap);
+    ui = {
+      fab: document.getElementById('errFab'), ov: document.getElementById('errOverlay'),
+      list: document.getElementById('errList')
+    };
+    ui.fab.onclick = function(){ ui.ov.classList.add('open'); };
+    document.getElementById('errClose').onclick = function(){ ui.ov.classList.remove('open'); };
+    document.getElementById('errClear').onclick = function(){ logs = []; ui.ov.classList.remove('open'); render(); };
+    document.getElementById('errCopy').onclick = function(){
+      var text = logs.map(function(l){ return '[' + l.t + '] ' + l.kind + ': ' + l.msg; }).join('\n\n');
+      var done = function(){ document.getElementById('errCopy').textContent = 'Copied ✓'; setTimeout(function(){ document.getElementById('errCopy').textContent = 'Copy all'; }, 1500); };
+      if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, function(){}); }
+      else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); done(); }catch(e){} document.body.removeChild(ta); }
+    };
+    ui.ov.addEventListener('click', function(e){ if(e.target === ui.ov) ui.ov.classList.remove('open'); });
+  }
+  function render(){
+    if(!ui) return;
+    ui.fab.style.display = logs.length ? '' : 'none';
+    ui.fab.textContent = '⚠️ ' + logs.length + (logs.length === 1 ? ' problem' : ' problems');
+    ui.list.innerHTML = logs.slice().reverse().map(function(l){
+      return '<div class="err-item"><i>' + esc(l.t) + '</i> <b>' + esc(l.kind) + '</b>\n' + esc(l.msg) + '</div>';
+    }).join('');
+  }
+  function add(kind, msg){
+    logs.push({ t: new Date().toLocaleTimeString(), kind: kind, msg: msg });
+    if(logs.length > 50) logs.shift();
+    if(document.body) { build(); render(); }
+    else document.addEventListener('DOMContentLoaded', function(){ build(); render(); });
+  }
+  window.addEventListener('error', function(e){
+    if(e.target && e.target !== window && (e.target.src || e.target.href)){
+      add('Failed to load', e.target.src || e.target.href); return;
+    }
+    add('Error', (e.message || 'Unknown error') + (e.filename ? '\n@ ' + String(e.filename).split('/').pop() + ':' + e.lineno + ':' + e.colno : '') + (e.error && e.error.stack ? '\n' + e.error.stack : ''));
+  }, true);
+  window.addEventListener('unhandledrejection', function(e){ add('Promise error', str(e.reason)); });
+  var origErr = console.error;
+  console.error = function(){
+    try{ add('console.error', Array.prototype.map.call(arguments, str).join(' ')); }catch(x){}
+    return origErr.apply(console, arguments);
+  };
+  window.reportProblem = add;
+})();
+</script>
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
 <nav class="drawer" id="drawer">
   <div class="drawer-title">My Dictionary</div>
@@ -581,6 +679,7 @@
       <div>
         <h1 class="title">My Dictionary</h1>
         <p class="sub" id="subCount">0 words learned</p>
+        <p class="sub" id="syncWarn" style="display:none; color:var(--danger); margin-top:6px;"></p>
       </div>
       <button class="menu-btn sync-btn" id="syncBtn" title="Settings" aria-label="Settings">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -733,6 +832,14 @@ const GIST_FILENAME = 'my-dictionary-data.json';
 let syncEnabled = false;
 let gistData = null;
 let pushTimer = null;
+let syncBlocked = false;   // true when loading from the Gist failed: we must NOT upload then
+
+function setSyncWarning(msg){
+  const el = document.getElementById('syncWarn');
+  if(!el) return;
+  el.textContent = msg || '';
+  el.style.display = msg ? '' : 'none';
+}
 
 function getSyncToken(){ try{ return window.localStorage.getItem(SYNC_TOKEN_KEY); } catch(e){ return null; } }
 function getSyncGistId(){ try{ return window.localStorage.getItem(SYNC_GISTID_KEY); } catch(e){ return null; } }
@@ -772,12 +879,26 @@ async function gistApiFetch(url, options){
     'Accept': 'application/vnd.github+json',
     'Authorization': 'token ' + token
   }, (options && options.headers) || {});
-  const res = await fetch(url, Object.assign({}, options, { headers }));
+  const res = await fetch(url, Object.assign({ cache: 'no-store' }, options, { headers }));
   if(!res.ok){
     const text = await res.text().catch(()=> '');
     throw new Error('GitHub API error ' + res.status + ': ' + text);
   }
   return res.json();
+}
+
+async function readGistFile(result){
+  const file = result.files && result.files[GIST_FILENAME];
+  if(!file) throw new Error('File ' + GIST_FILENAME + ' not found in this Gist');
+  let text = file.content;
+  if(file.truncated && file.raw_url){                 // big files come back cut off — fetch the full text
+    const r = await fetch(file.raw_url, { cache: 'no-store' });
+    if(!r.ok) throw new Error('Could not read full Gist file (' + r.status + ')');
+    text = await r.text();
+  }
+  const data = JSON.parse(text || '{}');
+  if(!data || typeof data !== 'object') throw new Error('Gist data is not valid');
+  return data;
 }
 
 function collectLocalDictData(){
@@ -821,9 +942,7 @@ async function createNewGistFromLocalData(token){
 async function connectToExistingGist(token, gistId){
   window.localStorage.setItem(SYNC_TOKEN_KEY, token);
   const result = await gistApiFetch('https://api.github.com/gists/' + gistId);
-  const file = result.files && result.files[GIST_FILENAME];
-  let data = {};
-  if(file && file.content){ try{ data = JSON.parse(file.content); }catch(e){ data = {}; } }
+  const data = await readGistFile(result);
   window.localStorage.setItem(SYNC_GISTID_KEY, gistId);
   applyGistDataToLocalCache(data);
   gistData = data;
@@ -832,6 +951,7 @@ async function connectToExistingGist(token, gistId){
 
 function schedulePush(){
   clearTimeout(pushTimer);
+  if(syncBlocked){ setSyncBadge('error'); return; }
   setSyncBadge('pending');
   pushTimer = setTimeout(pushGistNow, 900);
 }
@@ -855,11 +975,11 @@ async function pullGistNow(){
   const token = getSyncToken(), gistId = getSyncGistId();
   if(!token || !gistId) return;
   const result = await gistApiFetch('https://api.github.com/gists/' + gistId);
-  const file = result.files && result.files[GIST_FILENAME];
-  let data = {};
-  if(file && file.content){ try{ data = JSON.parse(file.content); }catch(e){ data = {}; } }
+  const data = await readGistFile(result);
   gistData = data;
   applyGistDataToLocalCache(data);
+  syncBlocked = false;
+  setSyncWarning('');
 }
 
 function disconnectSync(){
@@ -2316,6 +2436,9 @@ async function initApp(){
     }catch(e){
       console.error('initial gist pull failed, using local cache', e);
       gistData = collectLocalDictData();
+      syncBlocked = true;
+      setSyncBadge('error');
+      setSyncWarning('⚠️ Could not load from your Gist (' + String(e.message || e).slice(0, 90) + '). Nothing will be uploaded. Open Settings → Sync now to retry.');
     }
   }
   await loadAndRenderList();
